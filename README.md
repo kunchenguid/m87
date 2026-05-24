@@ -1,0 +1,220 @@
+<h1 align="center">firstpass</h1>
+
+<p align="center">
+  <a href="https://github.com/kunchenguid/firstpass/actions/workflows/ci.yml"
+    ><img
+      alt="CI"
+      src="https://img.shields.io/github/actions/workflow/status/kunchenguid/firstpass/ci.yml?style=flat-square&label=ci"
+  /></a>
+  <a href="https://github.com/kunchenguid/firstpass/actions/workflows/release-please.yml"
+    ><img
+      alt="Release"
+      src="https://img.shields.io/github/actions/workflow/status/kunchenguid/firstpass/release-please.yml?style=flat-square&label=release"
+  /></a>
+  <a href="https://www.npmjs.com/package/firstpass"
+    ><img
+      alt="npm"
+      src="https://img.shields.io/npm/v/firstpass?style=flat-square"
+  /></a>
+  <a href="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
+    ><img
+      alt="Platform"
+      src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
+  /></a>
+  <a href="https://x.com/kunchenguid"
+    ><img
+      alt="X"
+      src="https://img.shields.io/badge/X-@kunchenguid-black?style=flat-square"
+  /></a>
+  <a href="https://discord.gg/Wsy2NpnZDu"
+    ><img
+      alt="Discord"
+      src="https://img.shields.io/discord/1439901831038763092?style=flat-square&label=discord"
+  /></a>
+</p>
+
+<h3 align="center">An AI triages your GitHub inbox. You approve before anything ships.</h3>
+
+Your issues and pull requests pile up faster than you can read them. You could hand the whole thing to an agent, but then it is commenting, closing, and merging on your behalf while you are not looking - and that is exactly the part you do not want to give away.
+
+`firstpass` splits the work. A local daemon syncs your sources, an AI agent reads each item and recommends what to do, and the recommendation sits in a queue. Nothing source-visible happens until you preview the exact outgoing action and explicitly confirm it.
+
+- **Local-first** - the queue, daemon, SQLite database, and ACP sessions all live under `~/.firstpass`. No hosted backend.
+- **Preview-then-approve** - the agent only recommends. Every external write waits behind a preview and an explicit `--confirm` gate; destructive actions need `--confirm-destructive`.
+- **Pluggable sources** - GitHub issues and PRs out of the box, a deterministic `mock` plugin for safe end-to-end runs, and a documented plugin contract for adding your own.
+
+## Quick Start
+
+The bundled `mock` plugin produces a deterministic item with no external side effects, so it is the safest way to drive the whole pipeline:
+
+```sh
+$ firstpass init                      # create ~/.firstpass and the database
+$ firstpass plugin add mock --trust   # install a side-effect-free source
+$ firstpass daemon start              # the sole worker: syncs, triages, acts
+$ firstpass sync                      # nudge an immediate sync + triage
+$ firstpass list                      # the AI-triaged inbox, with recommendation ids
+mock:issue-1   comment   rec_a1b2   "Reply asking for a repro"
+
+$ firstpass preview rec_a1b2          # see the exact outgoing action (the gate)
+$ firstpass approve rec_a1b2 --confirm # confirm and execute
+```
+
+Run `firstpass` with no arguments in a terminal to open the live interactive inbox instead.
+
+## Install
+
+**npm (global)**
+
+```sh
+npm install -g firstpass
+firstpass --version
+```
+
+**From source**
+
+```sh
+git clone https://github.com/kunchenguid/firstpass
+cd firstpass
+npm install -g .   # builds dist/ via prepack, then installs the `firstpass` binary
+```
+
+To hack on the code without installing, run it straight from source with `node src/cli/index.js <command>` (see [Development](#development)).
+
+## How It Works
+
+The daemon is the only worker. It owns sync, triage, action execution, and automation jobs - the CLI and TUI just emit intents and read state.
+
+```
+  sources (github, mock, ...)
+          │  daemon sync
+          ▼
+        items ───────► agent triage (ACP) ───────► recommendation
+                                                         │
+                                                         ▼
+                                                   inbox / list
+                                                         │
+                                            preview  ◄───┘  (the gate)
+                                                │
+                                          approve --confirm
+                                                │
+                              ┌─────────────────┴─────────────────┐
+                              ▼                                   ▼
+                      source-visible action              automation job (draft PR)
+                              │                                   │
+                              ▼                                   ▼
+                          audit trail                       reviewable PR
+```
+
+- **The daemon is the sole actor** - syncing, triage, and writes all flow through one background process so there is a single source of truth and one audit trail.
+- **Approval is preview-then-confirm** - `preview` renders the precise effect; `approve --confirm` is the one human gate before anything reaches a source.
+- **Agent is ACP-pluggable** - `firstpass` auto-detects an installed provider CLI (`claude`, then `codex`, then `opencode`) as its `acp:` target, or you set one explicitly in config.
+- **Automation jobs stay reviewable** - approving a fix option queues a coding-agent job that the daemon runs into a draft pull request. It never merges for you.
+
+## CLI Reference
+
+| Command                          | Description                                                  |
+| -------------------------------- | ------------------------------------------------------------ |
+| `firstpass init`                 | Initialize the local state directory and database            |
+| `firstpass status`               | Show resolved agent, plugins, queue, and inbox status        |
+| `firstpass sync`                 | Nudge the daemon to sync + triage all active plugins now     |
+| `firstpass list`                 | List the active review inbox                                 |
+| `firstpass view <item>`          | Show one item and its recommendation detail                  |
+| `firstpass open <item>`          | Print the item's source URL                                  |
+| `firstpass copy-handoff <item>`  | Print a copyable agent handoff prompt for one item           |
+| `firstpass preview <rec>`        | Preview what approving an option would do (the gate)         |
+| `firstpass approve <rec>`        | Approve an option - the one human gate                       |
+| `firstpass triage <item>`        | Triage one newly synced item                                 |
+| `firstpass rerun <item>`         | Supersede the recommendation and re-triage an item           |
+| `firstpass dismiss <item>`       | Dismiss an item                                              |
+| `firstpass mark-handled <item>`  | Mark an item handled                                         |
+| `firstpass snooze <item> <dur>`  | Snooze an item until later (e.g. `1d`, `4h`)                 |
+| `firstpass plugin ...`           | `add`, `list`, `configure`, `sync`, `doctor` source plugins  |
+| `firstpass job ...`              | `list`, `view`, `attach` automation jobs                     |
+| `firstpass daemon ...`           | `start`, `stop`, `status`, `restart`, `install`, `uninstall` |
+| `firstpass audit export`         | Export the action audit trail                                |
+| `firstpass audit receipt <id>`   | Show a receipt for an approval                               |
+| `firstpass state export\|import` | Portable, secret-redacted state export/import                |
+| `firstpass retention cleanup`    | Delete expired prompt contexts                               |
+| `firstpass update [--check]`     | Check for and install a newer release from npm               |
+
+### Flags
+
+| Command                    | Flag                    | Description                            |
+| -------------------------- | ----------------------- | -------------------------------------- |
+| `preview`                  | `--option <selector>`   | Pick an option by id or position       |
+| `approve`                  | `--option <selector>`   | Pick an option by id or position       |
+| `approve`                  | `--confirm`             | Confirm external-write actions         |
+| `approve`                  | `--confirm-destructive` | Confirm destructive actions            |
+| `rerun`                    | `--instructions <text>` | Extra instructions for the agent       |
+| `plugin add` / `configure` | `--config <k=v...>`     | Set plugin configuration pairs         |
+| `plugin add`               | `--trust`               | Trust and install the plugin           |
+| `daemon run`               | `--once`                | Process the queue once and exit        |
+| `update`                   | `--check`               | Only check the registry; never install |
+
+## Sources
+
+### GitHub
+
+The bundled GitHub plugin syncs issues and pull requests through `gh`, and supports comments, close/reopen, PR reviews, and merges.
+
+```sh
+gh auth status || gh auth login
+firstpass plugin add github --trust
+firstpass plugin configure github \
+  --config username=<github-login> \
+  --config explicit_repos=<owner>/<repo>
+firstpass plugin doctor                 # confirm the daemon resolves your gh credentials
+```
+
+`gh` must be authenticated in the same environment the daemon runs under. Configure at least one source (`explicit_repos`, `owned_repos=true`, `repo_conditions`, or `authored_external=true`), or sync completes with an empty inbox.
+
+Every item is stamped with a **role**: _maintainer_ items (repos you own or configure) expose all actions including `merge` and `review`; _contributor_ items (things you authored elsewhere, via `authored_external`) carry a `[contrib]` badge and only offer comment/close. The full GitHub plugin config table lives in [`docs/plugin-author-guide.md`](docs/plugin-author-guide.md).
+
+### Gmail
+
+The bundled Gmail plugin is demo-only and fixture-backed in this release. It does not perform live Gmail writes.
+
+## Configuration
+
+Config lives at `~/.firstpass/config.yaml`. The `state_dir` setting controls where the SQLite database, plugins, ACP sessions, daemon PID, and retained artifacts are stored.
+
+```yaml
+agent: null # auto-detect a provider CLI (claude, then codex, then opencode); or set an acp: target
+poll_interval: 300
+state_dir: ~/.firstpass
+acp_registry_overrides: {}
+retention:
+  raw_context_ttl: 30d
+  prompt_ttl: 30d
+  draft_ttl: active
+  attachment_ttl: 7d
+  audit_ttl: keep
+sources: []
+```
+
+If `~/.firstpass/AGENTS.md` exists, its contents are passed to every triage as a user policy, so you can steer recommendations globally. Run `firstpass status` to see the resolved agent.
+
+## Running As A Service
+
+```sh
+firstpass daemon run            # foreground; logs every sync/triage/warn until Ctrl-C
+firstpass daemon start          # detached background process
+firstpass daemon status         # report whether the daemon is running
+firstpass daemon install        # managed OS service: launchd / systemd --user / schtasks
+firstpass daemon uninstall
+```
+
+A managed daemon launched from a GUI context inherits a minimal `PATH`, so `firstpass` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs. Set `FIRSTPASS_SKIP_SHELLENV=1` to disable that resolution.
+
+## Development
+
+```sh
+pnpm install
+pnpm run build      # bundle src/ -> dist/cli.js via esbuild
+pnpm run lint       # eslint
+pnpm run typecheck  # tsc --noEmit
+pnpm test           # vitest
+node src/cli/index.js <command>  # run from source, no build needed
+```
+
+Contributions to `main` must be pushed through [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) - see [CONTRIBUTING.md](CONTRIBUTING.md).

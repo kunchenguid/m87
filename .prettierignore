@@ -1,0 +1,7 @@
+.gnhf/
+node_modules/
+pnpm-lock.yaml
+dist/
+coverage/
+*.tgz
+CHANGELOG.md
