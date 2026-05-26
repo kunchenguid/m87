@@ -61,7 +61,14 @@ const getGhBinary = () =>
     : "gh";
 
 const runGh = async (args, options = {}) => {
-  const { stdout } = await execFileAsync(getGhBinary(), args, {
+  const bin = getGhBinary();
+  // A real gh is a native binary (gh / gh.exe) that execFile resolves directly.
+  // A Node-script gh shim (e.g. a JS wrapper, or the test fake) can't be exec'd
+  // on Windows, so run it under the current Node instead.
+  const [command, commandArgs] = /\.[mc]?js$/i.test(bin)
+    ? [process.execPath, [bin, ...args]]
+    : [bin, args];
+  const { stdout } = await execFileAsync(command, commandArgs, {
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024,
     ...options,

@@ -53,7 +53,9 @@ const runPluginWithInput = (args, input, env = process.env) =>
  */
 async function writeFakeGh(scriptLines) {
   const tempDir = await mkdtemp(join(tmpdir(), "firstpass-gh-"));
-  const fakeGhPath = join(tempDir, "gh");
+  // .mjs so the plugin runs it under Node on every platform (Windows can't exec
+  // a bare shebang script); the script body below is ESM.
+  const fakeGhPath = join(tempDir, "gh.mjs");
   const callsPath = join(tempDir, "calls.jsonl");
   await writeFile(
     fakeGhPath,
