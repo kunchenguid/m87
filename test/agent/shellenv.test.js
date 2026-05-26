@@ -41,11 +41,17 @@ describe("agent/shellenv applyLoginShellEnv", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("harvests PATH from the login shell when not attached to a TTY", () => {
-    process.stdout.isTTY = false;
-    applyLoginShellEnv();
-    expect(process.env.PATH).toBe(HARVESTED);
-  });
+  // Login-shell PATH harvesting is POSIX-only by design (applyLoginShellEnv
+  // no-ops on Windows, which has no login-shell `env` to harvest), and the fake
+  // shell is a /bin/sh script that Windows can't run.
+  it.skipIf(process.platform === "win32")(
+    "harvests PATH from the login shell when not attached to a TTY",
+    () => {
+      process.stdout.isTTY = false;
+      applyLoginShellEnv();
+      expect(process.env.PATH).toBe(HARVESTED);
+    },
+  );
 
   it("does NOT harvest when stdout is a TTY (PATH is already correct, and harvesting steals the terminal)", () => {
     process.stdout.isTTY = true;

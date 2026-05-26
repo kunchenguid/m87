@@ -69,8 +69,15 @@ export async function runPluginCommand(binaryPath, command, input) {
 
   let stdout;
   try {
-    stdout = await exec(binaryPath, args);
+    // Launch JS plugins under the current Node directly. Spawning the .js file
+    // itself relies on a POSIX shebang, which Windows cannot exec; going through
+    // process.execPath is portable and pins the plugin to our Node. Other
+    // binaries (.exe, native) are executed directly.
+    stdout = /\.[mc]?js$/i.test(binaryPath)
+      ? await exec(process.execPath, [binaryPath, ...args])
+      : await exec(binaryPath, args);
   } catch (err) {
+    // A non-executable script on POSIX surfaces as ENOEXEC; fall back to Node.
     if (err?.code === "ENOEXEC") {
       stdout = await exec(process.execPath, [binaryPath, ...args]);
     } else {
