@@ -39,7 +39,7 @@ const RECOMMENDATION = {
   usage: { tokens_in: 10 },
 };
 
-describe("e2e: daemon run shuts down promptly on a signal", () => {
+describe("e2e: daemon run shuts down promptly while a slow turn is in flight", () => {
   let homeDir;
   let stateDir;
   let env;
@@ -67,9 +67,10 @@ describe("e2e: daemon run shuts down promptly on a signal", () => {
     rmSync(homeDir, { recursive: true, force: true });
   });
 
-  it("exits within seconds of SIGINT even while a slow agent turn is in flight", async () => {
-    // An agent that takes 30s to respond, so a triage turn is guaranteed to be
-    // mid-flight (and its subprocess holding the event loop open) at SIGINT.
+  // Start a daemon against an agent that takes 30s to respond, then return once
+  // a triage turn is genuinely mid-flight (its subprocess holding the event
+  // loop open). Shutdown must beat that 30s delay.
+  async function startDaemonWithInFlightTurn() {
     const slow = await createMockAcpTarget(
       { homeDir, stateDir },
       { response: RECOMMENDATION, promptDelayMs: 30000 },
@@ -90,7 +91,6 @@ describe("e2e: daemon run shuts down promptly on a signal", () => {
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
     await firstpass("sync");
 
-    // wait until the triage agent turn is actually running
     const running = await waitFor(() => {
       const db = openDb();
       const row = db
@@ -100,11 +100,16 @@ describe("e2e: daemon run shuts down promptly on a signal", () => {
       return row ? true : null;
     });
     expect(running, daemon.stderr).toBe(true);
+  }
 
-    // SIGINT the daemon (not its children) and require a prompt exit, well
-    // before the 30s agent delay could complete.
+  // The cross-platform path: `firstpass daemon stop` over the control socket
+  // (UDS on POSIX, named pipe on Windows). This is the only graceful shutdown
+  // available on Windows, which has no POSIX signals.
+  it("exits within seconds of a control-channel stop request", async () => {
+    await startDaemonWithInFlightTurn();
+
     const start = Date.now();
-    daemon.signal("SIGINT");
+    await firstpass("daemon", "stop");
     const exitedInTime = await Promise.race([
       daemon.exited.then(() => true),
       new Promise((r) => setTimeout(() => r(false), 8000)),
@@ -113,4 +118,24 @@ describe("e2e: daemon run shuts down promptly on a signal", () => {
     expect(Date.now() - start).toBeLessThan(8000);
     daemon = undefined; // already exited; skip afterEach stop
   });
+
+  // POSIX terminal/service shutdown (Ctrl-C, systemd SIGTERM). Skipped on
+  // Windows, which delivers no catchable SIGINT - there the control-channel
+  // stop above is the graceful path.
+  it.skipIf(process.platform === "win32")(
+    "exits within seconds of SIGINT",
+    async () => {
+      await startDaemonWithInFlightTurn();
+
+      const start = Date.now();
+      daemon.signal("SIGINT");
+      const exitedInTime = await Promise.race([
+        daemon.exited.then(() => true),
+        new Promise((r) => setTimeout(() => r(false), 8000)),
+      ]);
+      expect(exitedInTime, daemon.stderr).toBe(true);
+      expect(Date.now() - start).toBeLessThan(8000);
+      daemon = undefined; // already exited; skip afterEach stop
+    },
+  );
 });

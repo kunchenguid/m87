@@ -25,6 +25,7 @@ import {
   applyLoginShellEnv,
   shouldSkipLoginShellEnv,
 } from "../agent/shellenv.js";
+import { createControlServer, sendControl } from "../core/control.js";
 import { createDatabase } from "../core/database.js";
 import { makeEvent } from "../core/event.js";
 import { deadLetterCount, enqueue, pendingCount } from "../core/queue.js";
@@ -126,12 +127,17 @@ async function pollFor(
   }
 }
 
-// Ask the running daemon to sync immediately (POSIX). Returns false if the
-// signal can't be delivered (e.g. Windows), where the daemon syncs on its tick.
-function nudgeDaemonSync(pid) {
+// Ask the running daemon to sync immediately over the control channel. Returns
+// false if the daemon can't be reached (then the caller falls back to a short
+// poll, since the daemon syncs on its own tick regardless).
+async function requestDaemonSync() {
   try {
-    process.kill(pid, "SIGUSR1");
-    return true;
+    const reply = await sendControl(
+      getStatePaths().controlAddress,
+      { cmd: "sync" },
+      { timeoutMs: 3000 },
+    );
+    return Boolean(reply && reply.ok);
   } catch {
     return false;
   }
@@ -330,7 +336,7 @@ plugin
       return fail(`plugin not installed: ${pluginId}`);
     }
     const before = record.last_sync_at;
-    const nudged = nudgeDaemonSync(pid);
+    const nudged = await requestDaemonSync();
     const synced = await pollFor(
       () => {
         const r = db
@@ -389,7 +395,7 @@ program
     if (!pid) return;
     const db = openDb();
     const before = db.prepare("select count(*) c from events").get().c;
-    const nudged = nudgeDaemonSync(pid);
+    const nudged = await requestDaemonSync();
     // wait for the event log to advance (sync produced facts) or settle
     await pollFor(
       () => {
@@ -1190,9 +1196,9 @@ daemon
     const runtime = openRuntime({
       onError: (e) => process.stderr.write(`warn: ${e.message}\n`),
     });
-    const { pidPath } = getStatePaths();
-    writeFileSync(pidPath, String(process.pid));
+    const { pidPath, controlAddress } = getStatePaths();
     if (options.once) {
+      writeFileSync(pidPath, String(process.pid));
       await scheduleSync(runtime);
       await runOnce(runtime);
       runtime.db.close();
@@ -1201,9 +1207,9 @@ daemon
     }
     const controller = new AbortController();
     let stopping = false;
-    // First signal: graceful abort (the loop stops scheduling and the abort
-    // propagates into in-flight effects so the agent subprocess is torn down).
-    // Second signal: the user is impatient - exit now.
+    // First stop request: graceful abort (the loop stops scheduling and the
+    // abort propagates into in-flight effects so the agent subprocess is torn
+    // down). Second request: the caller is impatient - exit now.
     const stop = () => {
       if (stopping) {
         process.exit(1);
@@ -1212,10 +1218,34 @@ daemon
       stopping = true;
       controller.abort();
     };
-    process.on("SIGTERM", stop);
+    // Terminal/service signals trigger graceful shutdown on POSIX. Windows has
+    // no POSIX signals, so there the control channel's "stop" command is the
+    // graceful path (see `firstpass daemon stop`).
     process.on("SIGINT", stop);
-    // `firstpass sync` pokes the daemon to sync immediately (POSIX).
-    process.on("SIGUSR1", () => scheduleSync(runtime));
+    if (process.platform !== "win32") {
+      process.on("SIGTERM", stop);
+      process.on("SIGHUP", stop);
+    }
+    // The CLI drives the daemon over a local control socket (UDS on POSIX, a
+    // named pipe on Windows): "sync" nudges an immediate sync, "stop" requests
+    // graceful shutdown. This replaces the POSIX-only SIGUSR1/SIGTERM IPC.
+    const control = await createControlServer(controlAddress, async (msg) => {
+      if (msg && msg.cmd === "sync") {
+        await scheduleSync(runtime);
+        return { ok: true };
+      }
+      if (msg && msg.cmd === "stop") {
+        stop();
+        return { ok: true };
+      }
+      if (msg && msg.cmd === "ping") {
+        return { ok: true, pid: process.pid };
+      }
+      return { ok: false, error: `unknown command: ${msg && msg.cmd}` };
+    });
+    // Advertise liveness only once the control channel is bound, so any client
+    // that sees the pidfile can reach us.
+    writeFileSync(pidPath, String(process.pid));
     let lastSync = 0;
     try {
       await runtime.loop.runForever({
@@ -1231,6 +1261,7 @@ daemon
         },
       });
     } finally {
+      control.close();
       // Give aborted effects a brief, bounded window to cancel their agent
       // turns; cap it so a wedged child can never block shutdown.
       await Promise.race([
@@ -1301,16 +1332,28 @@ daemon
 daemon
   .command("stop")
   .description("Stop the background daemon")
-  .action(() => {
-    const { pidPath } = getStatePaths();
+  .action(async () => {
+    const { pidPath, controlAddress } = getStatePaths();
     if (!existsSync(pidPath)) return out({ status: "not_running" });
     const pid = Number(readFileSync(pidPath, "utf8"));
     try {
-      process.kill(pid, "SIGTERM");
-      out({ status: "stopped", pid });
+      // Graceful, cross-platform stop: ask the daemon to drain in-flight work.
+      await sendControl(controlAddress, { cmd: "stop" }, { timeoutMs: 3000 });
     } catch {
-      out({ status: "not_running" });
+      // Control channel unreachable (stale pidfile, or a pre-socket daemon):
+      // fall back to a signal. This is forcible on Windows.
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {
+        return out({ status: "not_running" });
+      }
     }
+    // Wait for the process to actually exit so callers can rely on a clean stop.
+    const gone = await pollFor(() => (isAlive(pid) ? null : true), {
+      timeoutMs: 8000,
+      intervalMs: 100,
+    });
+    out({ status: gone ? "stopped" : "stopping", pid });
   });
 
 function isAlive(pid) {
@@ -1356,15 +1399,19 @@ daemon
   .command("restart")
   .description("Restart the background daemon")
   .action(async () => {
-    const { logPath } = getStatePaths();
+    const { logPath, controlAddress } = getStatePaths();
     const pid = runningDaemonPid();
     if (pid !== null) {
       try {
-        process.kill(pid, "SIGTERM");
+        await sendControl(controlAddress, { cmd: "stop" }, { timeoutMs: 3000 });
       } catch {
-        // already gone
+        try {
+          process.kill(pid, "SIGTERM");
+        } catch {
+          // already gone
+        }
       }
-      for (let i = 0; i < 50 && isAlive(pid); i += 1) {
+      for (let i = 0; i < 80 && isAlive(pid); i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
