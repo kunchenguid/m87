@@ -7,7 +7,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDatabase } from "../../src/core/database.js";
 import { makeEvent } from "../../src/core/event.js";
 import { project, itemId } from "../../src/core/projections.js";
-import { renderInboxView } from "../../src/tui/render.js";
+import {
+  renderInboxView,
+  willDoWindow,
+  wrapText,
+} from "../../src/tui/render.js";
 
 const ITEM = itemId("mock", "issue-1");
 
@@ -136,5 +140,67 @@ describe("tui/render", () => {
     const view = renderInboxView(db, { selectedIndex: 0, agentTarget: "none" });
     expect(view).toContain("[contrib]");
     expect(view).toContain("[stale]");
+  });
+});
+
+describe("tui/wrapText", () => {
+  it("wraps to the column width and collapses whitespace", () => {
+    const lines = wrapText("the quick   brown\nfox jumps", 9);
+    expect(lines).toEqual(["the quick", "brown fox", "jumps"]);
+  });
+
+  it("hard-splits a word longer than the width", () => {
+    expect(wrapText("supercalifragilistic", 5)).toEqual([
+      "super",
+      "calif",
+      "ragil",
+      "istic",
+    ]);
+  });
+
+  it("returns no lines for empty text", () => {
+    expect(wrapText("   ", 10)).toEqual([]);
+  });
+});
+
+describe("tui/willDoWindow", () => {
+  const opt = {
+    number: 1,
+    actions: [
+      {
+        type: "comment",
+        preview: Array.from({ length: 200 }, (_, i) => `w${i}`).join(" "),
+      },
+    ],
+    automation: null,
+  };
+  const detail = { summary: "short summary", options: [opt] };
+
+  it("windows the lines to the viewport and reports there is more below", () => {
+    const win = willDoWindow({
+      detail,
+      opt,
+      paneWidth: 50,
+      paneHeight: 12,
+      scroll: 0,
+    });
+    expect(win.lines.length).toBeGreaterThan(win.viewport);
+    expect(win.visible).toHaveLength(win.viewport);
+    expect(win.maxScroll).toBe(win.lines.length - win.viewport);
+    expect(win.moreAbove).toBe(false);
+    expect(win.moreBelow).toBe(true);
+  });
+
+  it("clamps an over-scroll to the bottom and flips the indicators", () => {
+    const win = willDoWindow({
+      detail,
+      opt,
+      paneWidth: 50,
+      paneHeight: 12,
+      scroll: 9999,
+    });
+    expect(win.start).toBe(win.maxScroll);
+    expect(win.moreBelow).toBe(false);
+    expect(win.moreAbove).toBe(true);
   });
 });

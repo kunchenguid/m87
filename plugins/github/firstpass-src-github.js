@@ -535,6 +535,9 @@ const mapGhObject = (
       viewer: username,
       is_self_authored: typeof username === "string" && actor === username,
       stale,
+      // Short source label for the inbox meta line. Core stays source-agnostic,
+      // so the plugin names what the item is about: "owner/repo · PR/issue #n".
+      display_handle: `${repository} · ${itemKind === "pr" ? "PR" : "issue"} #${number}`,
     },
     payload: {
       type: payloadType,

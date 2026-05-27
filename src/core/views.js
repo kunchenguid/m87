@@ -6,6 +6,7 @@ export function listInbox(db, now = new Date().toISOString()) {
   return db
     .prepare(
       `select r.id as recommendation_id, r.summary, i.id as item_id, i.title, i.url,
+              i.item_type, i.activity_at,
               i.local_state, i.attention_priority_hint, i.attention_reason,
               i.waiting_on, i.metadata_json
          from recommendations r join items i on i.id = r.item_id

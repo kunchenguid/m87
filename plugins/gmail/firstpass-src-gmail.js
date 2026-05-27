@@ -154,6 +154,12 @@ function sourceThreads(config) {
         waiting_on: "user",
         priority_hint: "normal",
       },
+      // Short source label for the inbox meta line: sender · subject. The same
+      // metadata convention the GitHub plugin uses, for a non-GitHub source.
+      metadata: {
+        display_handle:
+          "alice@example.com · Re: FirstPass Gmail integration follow-up",
+      },
       payload: {
         type: "thread_received",
         thread_id: "thread-1",

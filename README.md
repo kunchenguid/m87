@@ -40,12 +40,12 @@ You could hand the whole thing to an agent, but then it is commenting, closing, 
 
 `firstpass` splits the work.
 A local daemon syncs your sources, an AI agent reads each item and recommends what to do, and the recommendation sits in a queue.
-Nothing source-visible happens until you preview the exact outgoing action and explicitly confirm it.
+Nothing source-visible happens until you review the exact outgoing action and explicitly approve it.
 
 - **Local-first** - the queue, daemon, SQLite database, and ACP sessions all live under `~/.firstpass`.
   No hosted backend.
 - **Preview-then-approve** - the agent only recommends.
-  Every external write waits behind a preview and an explicit `--confirm` gate; destructive actions need `--confirm-destructive`.
+  Every external write waits behind a preview and explicit approval; CLI approval uses `--confirm`, and destructive actions need `--confirm-destructive`.
 - **Pluggable sources** - GitHub issues and PRs out of the box, plus a documented plugin contract for adding trusted sources of your own.
 
 ## Quick Start
@@ -68,7 +68,7 @@ $ firstpass sync
 $ firstpass
 ```
 
-External writes still wait behind preview and approval:
+External writes still wait behind preview and approval when using the CLI:
 
 ```sh
 $ firstpass preview <recommendation-id>
@@ -76,6 +76,8 @@ $ firstpass approve <recommendation-id> --confirm
 ```
 
 Run `firstpass` with no arguments in a terminal to open the live interactive inbox instead.
+Use ↑/↓ to move between items, press `1`-`9` to select an option, review the WILL DO detail, then press `a` to approve the selected option.
+Use `j`/`k` to scroll long WILL DO details.
 Press `i` for queue details, startup help, and other inbox info; press `i` or Esc to return.
 
 ## Install
@@ -109,12 +111,13 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
         items ───────► agent triage (ACP) ───────► recommendation
                                                          │
                                                          ▼
-                                                   inbox / list
-                                                         │
-                                            preview  ◄───┘  (the gate)
-                                                │
-                                          approve --confirm
-                                                │
+                                                    inbox / list
+                                                          │
+                                      preview / WILL DO  ◄─┘  (the gate)
+                                                 │
+                                         explicit approval
+                                  (TUI `a` or CLI `--confirm`)
+                                                 │
                               ┌─────────────────┴─────────────────┐
                               ▼                                   ▼
                       source-visible action              automation job (draft PR)
@@ -124,7 +127,7 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 ```
 
 - **The daemon is the sole actor** - syncing, triage, and writes all flow through one background process so there is a single source of truth and one audit trail.
-- **Approval is preview-then-confirm** - `preview` renders the precise effect; `approve --confirm` is the one human gate before anything reaches a source.
+- **Approval is preview-then-approve** - the CLI `preview` command and the TUI WILL DO detail render the precise effect before a human approval reaches a source.
 - **Agent is ACP-pluggable** - `firstpass` auto-detects an installed provider CLI (`claude`, then `codex`, then `opencode`) as its `acp:` target, or you set one explicitly in config.
 - **Automation jobs stay reviewable** - approving a fix option queues a coding-agent job that the daemon runs into a draft pull request.
   It never merges for you.

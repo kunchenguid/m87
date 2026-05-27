@@ -939,6 +939,25 @@ describe("github source plugin (contract v2)", () => {
     ).toBe(true);
   });
 
+  test("sync stamps a display_handle of repo + ref on items", async () => {
+    const { fakeGhPath } = await writeFakeGh(ghScriptForFirstpassRepo());
+
+    const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
+      ...process.env,
+      FIRSTPASS_GH_BIN: fakeGhPath,
+    });
+    const result = JSON.parse(stdout);
+
+    expect(result.events.length).toBeGreaterThan(0);
+    for (const event of result.events) {
+      // The plugin owns its source label; core just renders the string. It
+      // names the repo and the ref so the inbox is scannable by repo.
+      expect(event.metadata.display_handle).toMatch(
+        /^kunchenguid\/firstpass · (PR|issue) #\d+$/,
+      );
+    }
+  });
+
   test("sync marks a self-authored PR as is_self_authored", async () => {
     const { fakeGhPath } = await writeFakeGh(
       ghScriptForFirstpassRepo({

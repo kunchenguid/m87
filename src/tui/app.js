@@ -5,9 +5,9 @@ import { makeEvent } from "../core/event.js";
 import { enqueue } from "../core/queue.js";
 import { listInbox, logCursor } from "../core/views.js";
 import { InboxView, InfoView } from "./components.js";
-import { buildInboxModel } from "./render.js";
+import { buildInboxModel, mainLayout, willDoWindow } from "./render.js";
 
-const { createElement: h, useEffect, useState } = React;
+const { createElement: h, useEffect, useRef, useState } = React;
 
 // Interactive inbox. It TAILS the immutable log (polling a cheap cursor) and
 // projects its own view - the UI is a read-side projection (no push). User
@@ -18,6 +18,15 @@ function InboxApp({ db, agentTarget, daemonPid }) {
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
   const [selected, setSelected] = useState(0);
+  // Which recommendation option is selected for the current item. 0 is the
+  // agent's recommended option; number keys move it, `a` approves it. Reset to
+  // the recommended option whenever the selected item changes.
+  const [selectedOption, setSelectedOption] = useState(0);
+  // How far the WILL DO detail is scrolled. j/k move it; reset whenever the item
+  // or option changes (the detail content changes with them). maxScrollRef holds
+  // the current scroll ceiling, recomputed each render from the live geometry.
+  const [detailScroll, setDetailScroll] = useState(0);
+  const maxScrollRef = useRef(0);
   const [cursor, setCursor] = useState(logCursor(db));
   const [notice, setNotice] = useState("");
   const [view, setView] = useState("inbox");
@@ -34,6 +43,22 @@ function InboxApp({ db, agentTarget, daemonPid }) {
 
   const inbox = listInbox(db);
   const current = inbox[Math.min(selected, Math.max(0, inbox.length - 1))];
+  const currentRecommendationId = current?.recommendation_id ?? null;
+  const previousRecommendationId = useRef(currentRecommendationId);
+  const selectedOptionRecommendationId = useRef(currentRecommendationId);
+  const effectiveSelectedOption =
+    selectedOptionRecommendationId.current === currentRecommendationId
+      ? selectedOption
+      : 0;
+
+  useEffect(() => {
+    if (previousRecommendationId.current === currentRecommendationId) {
+      return;
+    }
+    previousRecommendationId.current = currentRecommendationId;
+    setSelectedOption(0);
+    setDetailScroll(0);
+  }, [currentRecommendationId]);
 
   // Enqueue a decision event for the daemon. Requires a live daemon; otherwise
   // the event would sit unprocessed, so we refuse and tell the user.
@@ -65,12 +90,30 @@ function InboxApp({ db, agentTarget, daemonPid }) {
       setView("info");
       return;
     }
-    if (key.downArrow || input === "j") {
+    // Arrows move between inbox items (and reset the option + detail scroll, since
+    // the recommendation changes). j/k are reserved for scrolling the detail.
+    if (key.downArrow) {
       setSelected((s) => Math.min(s + 1, inbox.length - 1));
+      selectedOptionRecommendationId.current = null;
+      setSelectedOption(0);
+      setDetailScroll(0);
       return;
     }
-    if (key.upArrow || input === "k") {
+    if (key.upArrow) {
       setSelected((s) => Math.max(s - 1, 0));
+      selectedOptionRecommendationId.current = null;
+      setSelectedOption(0);
+      setDetailScroll(0);
+      return;
+    }
+    // j/k scroll the WILL DO detail so a long reply can be read in full before
+    // approving. Clamped to the section's scroll ceiling (recomputed each render).
+    if (input === "j") {
+      setDetailScroll((s) => Math.min(s + 1, maxScrollRef.current));
+      return;
+    }
+    if (input === "k") {
+      setDetailScroll((s) => Math.max(0, s - 1));
       return;
     }
     if (input === "r") {
@@ -80,12 +123,30 @@ function InboxApp({ db, agentTarget, daemonPid }) {
     if (!current) {
       return;
     }
-    if (input === "a" || input === "A") {
-      const option = db
+    // Number keys SELECT an option (clamped to the live set); they never
+    // approve. Approval stays a deliberate `a` so selecting can later expand an
+    // option's detail before you commit.
+    if (/^[1-9]$/.test(input)) {
+      const count = db
         .prepare(
-          "select id from recommendation_options where recommendation_id=? order by position limit 1",
+          "select count(*) c from recommendation_options where recommendation_id=?",
         )
-        .get(current.recommendation_id);
+        .get(current.recommendation_id).c;
+      if (count > 0) {
+        selectedOptionRecommendationId.current = currentRecommendationId;
+        setSelectedOption(Math.min(Number(input) - 1, count - 1));
+        setDetailScroll(0);
+      }
+      return;
+    }
+    if (input === "a" || input === "A") {
+      const options = db
+        .prepare(
+          "select id from recommendation_options where recommendation_id=? order by position",
+        )
+        .all(current.recommendation_id);
+      const option =
+        options[Math.min(effectiveSelectedOption, options.length - 1)];
       if (option) {
         act(
           makeEvent({
@@ -141,12 +202,31 @@ function InboxApp({ db, agentTarget, daemonPid }) {
 
   const model = buildInboxModel(db, {
     selectedIndex: selected,
+    selectedOption: effectiveSelectedOption,
+    detailScroll,
     agentTarget,
     daemonRunning: Boolean(daemonPid()),
     notice,
   });
   // Reserve the bottom row so the final line never scrolls the alt-screen.
-  const dims = { model, width: columns, height: Math.max(10, rows - 1) };
+  const height = Math.max(10, rows - 1);
+  // Recompute how far the WILL DO detail can scroll, using the same geometry the
+  // view draws with, so j/k clamp to exactly what's on screen.
+  const selOpt =
+    model.detail?.options.find((o) => o.selected) ?? model.detail?.options[0];
+  if (model.detail && selOpt) {
+    const { rightWidth, bodyHeight } = mainLayout(columns, height, notice);
+    maxScrollRef.current = willDoWindow({
+      detail: model.detail,
+      opt: selOpt,
+      paneWidth: rightWidth,
+      paneHeight: bodyHeight,
+      scroll: detailScroll,
+    }).maxScroll;
+  } else {
+    maxScrollRef.current = 0;
+  }
+  const dims = { model, width: columns, height };
   return h(view === "info" ? InfoView : InboxView, dims);
 }
 

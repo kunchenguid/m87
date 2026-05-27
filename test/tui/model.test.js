@@ -137,4 +137,91 @@ describe("tui/buildInboxModel", () => {
     expect(row.badges).toContain("contrib");
     expect(row.badges).toContain("stale");
   });
+
+  it("renders the plugin's display_handle and age, and omits the default 'waiting on you'", () => {
+    surfaceItem(
+      db,
+      { activity_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
+      { waiting_on: "user" },
+      {
+        item_type: "pull_request",
+        metadata: { display_handle: "kunchenguid/firstpass · PR #221" },
+      },
+    );
+    recommend(db, [{ title: "Merge", confidence: "high", actions: [] }]);
+    const meta = buildInboxModel(db, { selectedIndex: 0 }).items[0].meta;
+    expect(meta.handle).toBe("kunchenguid/firstpass · PR #221");
+    expect(meta.age).toBe("2h");
+    expect(meta.text).toContain("kunchenguid/firstpass · PR #221");
+    expect(meta.text).toContain("2h");
+    // the inbox is your queue by default, so "waiting on you" is not repeated per row
+    expect(meta.waiting).toBeNull();
+    expect(meta.text).not.toContain("waiting on you");
+  });
+
+  it("surfaces only the non-default waiting states (e.g. waiting on others)", () => {
+    surfaceItem(db, {}, { waiting_on: "other" });
+    recommend(db, [{ title: "Wait", confidence: "high", actions: [] }]);
+    const meta = buildInboxModel(db, { selectedIndex: 0 }).items[0].meta;
+    expect(meta.waiting).toBe("waiting on others");
+    expect(meta.text).toContain("waiting on others");
+  });
+
+  it("falls back to the humanized item type when no display_handle is set", () => {
+    // No source-specific handle: any plugin's items still get a generic label
+    // from item_type (a core field) rather than a blank meta line.
+    surfaceItem(db, {}, {}, { item_type: "email_thread" });
+    recommend(db, [{ title: "Reply", confidence: "high", actions: [] }]);
+    const meta = buildInboxModel(db, { selectedIndex: 0 }).items[0].meta;
+    expect(meta.handle).toBe("email thread");
+  });
+
+  it("numbers recommendation options and marks the selected one", () => {
+    surfaceItem(db);
+    recommend(db, [
+      { title: "Merge", confidence: "high", actions: [] },
+      { title: "Hold", confidence: "medium", actions: [] },
+      { title: "Comment", confidence: "low", actions: [] },
+    ]);
+    const model = buildInboxModel(db, { selectedIndex: 0, selectedOption: 1 });
+    expect(model.detail.options[0].number).toBe(1);
+    expect(model.detail.options[1].number).toBe(2);
+    expect(model.detail.options[2].number).toBe(3);
+    expect(model.detail.options[0].selected).toBe(false);
+    expect(model.detail.options[1].selected).toBe(true);
+  });
+
+  it("threads each option's actions and automation for the WILL DO detail view", () => {
+    surfaceItem(db);
+    recommend(db, [
+      {
+        title: "Reply",
+        confidence: "high",
+        actions: [
+          {
+            id: "a1",
+            action_type: "comment",
+            params: { body: "Thanks for the update" },
+          },
+        ],
+        automation: { kind: "code_fix", prompt: "narrow the scope" },
+      },
+    ]);
+    const opt = buildInboxModel(db, { selectedIndex: 0 }).detail.options[0];
+    expect(opt.actions).toEqual([
+      { type: "comment", preview: "Thanks for the update" },
+    ]);
+    expect(opt.automation).toMatchObject({ prompt: "narrow the scope" });
+  });
+
+  it("defaults the selected option to the first (recommended) one", () => {
+    surfaceItem(db);
+    recommend(db, [
+      { title: "Merge", confidence: "high", actions: [] },
+      { title: "Hold", confidence: "low", actions: [] },
+    ]);
+    const model = buildInboxModel(db, { selectedIndex: 0 });
+    expect(model.detail.options[0].selected).toBe(true);
+    expect(model.detail.options[1].selected).toBe(false);
+  });
 });

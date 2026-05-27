@@ -132,6 +132,21 @@ describe("gmail source plugin (contract v2)", () => {
     expect(updated.payload.local_state).toBe("new");
   });
 
+  test("sync stamps a display_handle of sender + subject on threads", async () => {
+    const result = await runPlugin(
+      ["sync"],
+      { config: {}, fingerprints: {} },
+      CREDENTIALED_ENV,
+    );
+
+    const thread = result.events.find(
+      (event) => event.external_id === "gmail:thread:thread-1",
+    );
+    expect(thread.metadata.display_handle).toBe(
+      "alice@example.com · Re: FirstPass Gmail integration follow-up",
+    );
+  });
+
   test("sync emits a closed event when a thread disappears from the source", async () => {
     const baseline = { "gmail:thread:gone": "stale-fp" };
     const result = await runPlugin(

@@ -118,6 +118,8 @@ The core saves returned fingerprints only after events and warnings are durably 
 
 Events should use stable `external_id` values that can be inserted idempotently.
 Item events should include source-owned activity watermarks and payloads with enough detail for core projections.
+Item event `metadata` may include a short `display_handle` for inbox rows, such as `owner/repo · PR #123` or `sender · subject`.
+If omitted, the TUI falls back to the humanized `item_type`.
 Deletion or unavailable-item changes should be represented as events with the same external ids as prior items.
 Repeated sync calls may return duplicate events if that is the safest source behavior.
 
@@ -145,6 +147,7 @@ Safety levels are:
 The core passes the plugin's scope `config` (never an `account_id`) to `fetch`, `validate-action`, `preview-action`, `execute-action`, and the automation-workspace commands; plugins that only need the external tool's own auth may ignore it.
 `validate-action` must reject malformed payloads and should warn when source state changed since recommendation time.
 `preview-action` should show the exact outgoing text or source effect before approval.
+The TUI also builds a pre-approval WILL DO summary from action params; use plain visible payload names such as `body`, `text`, `message`, `comment`, or `labels` so users can review the selected option clearly.
 `execute-action` receives an `approval_id` and `idempotency_key` and should return `succeeded`, `failed`, or `already_applied`.
 Use the idempotency key whenever the source supports client tokens.
 When the source does not support client tokens, use natural keys or other best-effort checks and document that behavior in `idempotency`.

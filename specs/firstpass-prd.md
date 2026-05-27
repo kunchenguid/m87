@@ -124,13 +124,17 @@ A configured plugin is the unit of scope; there is no separate source-account ob
 ### Inbox And Detail
 
 The default UI is a review queue.
-Each row shows source, item type, sender or actor, title or subject, recommendation state, waiting state, and freshness.
+Each row uses two lines: the item title, then plugin-owned source context from `metadata.display_handle` or a humanized `item_type`, relative age, badges, and only non-default waiting states.
+Urgency is indicated by marker color, not by changing the row shape.
 After more plugins exist, the queue can contain rows like:
 
 ```text
-gmail/work     email_thread   alice@example.com     Reply: contract draft          action recommended
-github/oss     pull_request   contributor42         Fix failing Windows test       fix suggested
-x/personal     reply          @person               Clarify your post on agents    draft reply
+● Reply: contract draft
+  alice@example.com · contract draft · 2h
+● Fix failing Windows test
+  owner/repo · PR #123 · 1d  [contrib]
+● Clarify your post on agents
+  reply · 4h
 ```
 
 The detail pane shows normalized item metadata, plugin-rendered source context, agent rationale grounded in visible context, ordered recommendation options, proposed actions, action preview and safety warnings, token usage and model, and plugin execution status.
@@ -309,6 +313,7 @@ Fingerprints are committed only after the core has durably persisted every retur
 `sync` input fields are the plugin's scope `config` and prior `fingerprints`; there is no `account_id`.
 `sync` output fields are `status`, `events`, next `fingerprints`, optional `has_more`, optional `retry_after_seconds`, and `warnings`.
 Each event includes `external_id`, `lifecycle`, source item fields such as `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `fingerprint`, optional `attention`, opaque `payload`, optional `occurred_at`, and optional `metadata`.
+Event `metadata.display_handle` is an optional plugin-owned label for inbox rows; when absent, the UI falls back to the humanized `item_type`.
 The `attention` object includes `should_surface`, `reason`, `waiting_on`, and optional `priority_hint`.
 
 `status` is one of `complete`, `partial`, `rate_limited`, `permission_denied`, or `error`.
