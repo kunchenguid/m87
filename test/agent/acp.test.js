@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   detectAgentSpec,
+  detectAgentSpecs,
   resolveEffectiveAgentSpec,
 } from "../../src/agent/detect.js";
 import { parseAcpJsonOutput, runAcpTurn } from "../../src/agent/acp.js";
@@ -21,6 +22,27 @@ describe("agent/detect", () => {
     process.env.FIRSTPASS_AGENT_PROBE_PATH = "";
     expect(detectAgentSpec()).toBeNull();
     process.env.FIRSTPASS_AGENT_PROBE_PATH = prev;
+  });
+  it("returns an empty list of specs on an empty probe path", () => {
+    expect(detectAgentSpecs("")).toEqual([]);
+  });
+  it("lists every provider CLI present on the probe path in order", async () => {
+    const { mkdtempSync, writeFileSync, chmodSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const dir = mkdtempSync(join(tmpdir(), "fp-probe-"));
+    // Drop two of the three known provider binaries (skip codex) to confirm
+    // detection reports each present CLI and preserves AUTODETECT order.
+    for (const name of ["claude", "opencode"]) {
+      const file = join(dir, name);
+      writeFileSync(file, "#!/bin/sh\nexit 0\n");
+      chmodSync(file, 0o755);
+    }
+    const specs = detectAgentSpecs(dir);
+    expect(specs).toEqual([
+      { spec: "acp:claude", id: "claude" },
+      { spec: "acp:opencode", id: "opencode" },
+    ]);
   });
 });
 

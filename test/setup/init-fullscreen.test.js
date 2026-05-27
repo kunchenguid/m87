@@ -42,6 +42,10 @@ function pressReturn(stdin) {
   stdin.send("\r");
 }
 
+function pressDown(stdin) {
+  stdin.send("\x1b[B");
+}
+
 async function typeText(stdin, value) {
   for (const char of value) {
     stdin.send(char);
@@ -55,7 +59,73 @@ async function submitStep(stdin) {
 }
 
 describe("setup/init fullscreen wizard", () => {
-  it("visits first-run choices after review before submitting", async () => {
+  it("submits from the combined review step, carrying the background-run choice", async () => {
+    const stdout = new FakeStdout();
+    const stdin = new FakeStdin();
+    const { instance, restore, result } = startInitWizardTui({
+      stdout: /** @type {any} */ (stdout),
+      stdin: /** @type {any} */ (stdin),
+      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+      initialSelections: { currentStep: "review" },
+    });
+
+    try {
+      await sleep(50);
+      // Default is "Start now & launch at login"; move down to the session-only
+      // option on the same screen.
+      pressDown(stdin);
+      await sleep(20);
+      // A single confirm submits straight from review - there is no separate
+      // step to click through anymore.
+      pressReturn(stdin);
+      const selections = await Promise.race([
+        result,
+        sleep(500).then(() => null),
+      ]);
+      expect(selections).not.toBeNull();
+      expect(selections.currentStep).toBe("review");
+      expect(selections.installService).toBe(false);
+      expect(selections.startDaemon).toBe(true);
+    } finally {
+      instance.unmount();
+      await instance.waitUntilExit();
+      restore();
+    }
+  });
+
+  it("highlights GitHub without entering its config; selecting skip advances past source", async () => {
+    const stdout = new FakeStdout();
+    const stdin = new FakeStdin();
+    const { instance, restore, result } = startInitWizardTui({
+      stdout: /** @type {any} */ (stdout),
+      stdin: /** @type {any} */ (stdin),
+      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+      initialSelections: { currentStep: "source", source: "github" },
+    });
+
+    try {
+      await sleep(50);
+      // Moving the highlight to skip must not jump into GitHub config.
+      pressDown(stdin);
+      await sleep(20);
+      await submitStep(stdin); // source (skip) -> review
+      await submitStep(stdin); // review -> submit
+
+      const selections = await Promise.race([
+        result,
+        sleep(500).then(() => null),
+      ]);
+      expect(selections).not.toBeNull();
+      expect(selections.source).toBe("skip");
+      expect(selections.currentStep).toBe("review");
+    } finally {
+      instance.unmount();
+      await instance.waitUntilExit();
+      restore();
+    }
+  });
+
+  it("opens GitHub scope config on confirm before advancing", async () => {
     const stdout = new FakeStdout();
     const stdin = new FakeStdin();
     const { instance, restore, result } = startInitWizardTui({
@@ -63,29 +133,27 @@ describe("setup/init fullscreen wizard", () => {
       stdin: /** @type {any} */ (stdin),
       context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
       initialSelections: {
-        currentStep: "apply",
-        installService: false,
-        startDaemon: false,
+        currentStep: "source",
+        source: "github",
+        githubScope: "explicit",
       },
     });
 
     try {
       await sleep(50);
-      pressReturn(stdin);
+      await submitStep(stdin); // confirm GitHub -> enter scope config (no advance)
+      await typeText(stdin, "kunchenguid/firstpass");
+      await submitStep(stdin); // scope config -> review
+      await submitStep(stdin); // review -> submit
 
-      const afterReview = await Promise.race([
-        result.then(() => "resolved"),
-        sleep(80).then(() => "pending"),
-      ]);
-      expect(afterReview).toBe("pending");
-
-      pressReturn(stdin);
       const selections = await Promise.race([
         result,
         sleep(500).then(() => null),
       ]);
       expect(selections).not.toBeNull();
-      expect(selections.currentStep).toBe("first-run");
+      expect(selections.source).toBe("github");
+      expect(selections.githubRepos).toEqual(["kunchenguid/firstpass"]);
+      expect(selections.currentStep).toBe("review");
     } finally {
       instance.unmount();
       await instance.waitUntilExit();
@@ -126,6 +194,7 @@ describe("setup/init fullscreen wizard", () => {
       initialSelections: {
         currentStep: "source",
         source: "github",
+        sourceStage: "github",
         githubScope: "explicit",
         githubRepoInput: "",
       },

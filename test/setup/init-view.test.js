@@ -29,9 +29,45 @@ describe("setup/InitWizardView", () => {
 
     expect(out).toContain("firstpass");
     expect(out).toContain("setup wizard");
-    expect(out).toContain("Agent Boundary");
-    expect(out).toContain("Auto-detect provider CLI");
+    expect(out).toContain("AI Agent");
+    expect(out).toContain("Detect automatically");
     expect(out).toContain("GitHub");
     expect(out.toLowerCase()).not.toContain("mock");
+  });
+
+  it("marks the repository input with a cursor so it reads as editable", () => {
+    const context = { stateDir: "/tmp/firstpass-state" };
+    const repoInput = renderToString(
+      h(InitWizardView, {
+        model: buildInitWizardModel(
+          {
+            ...defaultInitSelections(),
+            currentStep: "source",
+            source: "github",
+            sourceStage: "github",
+            githubScope: "explicit",
+          },
+          context,
+        ),
+        width: 100,
+        height: 30,
+      }),
+    );
+    // The cursor block sits on the editable field, ahead of the placeholder.
+    expect(repoInput).toContain("█");
+    expect(repoInput).toContain("owner/repo");
+
+    // Screens without a text field show no cursor.
+    const noInput = renderToString(
+      h(InitWizardView, {
+        model: buildInitWizardModel(
+          { ...defaultInitSelections(), currentStep: "agent" },
+          context,
+        ),
+        width: 100,
+        height: 30,
+      }),
+    );
+    expect(noInput).not.toContain("█");
   });
 });

@@ -1,16 +1,13 @@
-const STEP_ORDER = ["core", "agent", "source", "daemon", "apply", "first-run"];
+const STEP_ORDER = ["agent", "source", "review"];
 
 const STEP_LABELS = {
-  core: "core",
   agent: "agent",
   source: "source",
-  daemon: "daemon",
-  apply: "apply",
-  "first-run": "first run",
+  review: "review",
 };
 
 const GITHUB_SCOPE_LABELS = {
-  explicit: "Explicit repositories",
+  explicit: "Specific repositories",
   owned: "Owned repositories",
   public_owned: "Public owned repositories",
   public_starred: "Public owned repositories you starred",
@@ -18,22 +15,23 @@ const GITHUB_SCOPE_LABELS = {
 };
 
 const VALID_SOURCES = new Set(["skip", "github"]);
-const VALID_AGENT_MODES = new Set(["auto", "custom"]);
+const VALID_AGENT_MODES = new Set(["auto", "pinned", "custom"]);
 const VALID_GITHUB_SCOPES = new Set(Object.keys(GITHUB_SCOPE_LABELS));
 
 export function defaultInitSelections(overrides = {}) {
   return {
-    currentStep: "core",
+    currentStep: "agent",
     agentMode: "auto",
+    pinnedAgent: "",
     customAgent: "",
     source: "skip",
+    sourceStage: "choose",
     githubScope: "explicit",
     githubRepos: [],
     githubRepoInput: "",
     githubUsername: "",
     installService: true,
     startDaemon: true,
-    runFirstSync: false,
     choiceIndex: 0,
     notice: "",
     ...overrides,
@@ -47,6 +45,7 @@ function normalizeSelections(selections = {}) {
     ? normalized.githubRepos.filter((repo) => typeof repo === "string")
     : [];
   normalized.customAgent = String(normalized.customAgent ?? "").trim();
+  normalized.pinnedAgent = String(normalized.pinnedAgent ?? "").trim();
   normalized.githubRepoInput = String(normalized.githubRepoInput ?? "").trim();
   normalized.githubUsername = String(normalized.githubUsername ?? "").trim();
   if (!STEP_ORDER.includes(normalized.currentStep)) {
@@ -57,6 +56,9 @@ function normalizeSelections(selections = {}) {
   }
   if (!VALID_SOURCES.has(normalized.source)) {
     normalized.source = String(normalized.source ?? "");
+  }
+  if (normalized.sourceStage !== "github") {
+    normalized.sourceStage = "choose";
   }
   if (!VALID_GITHUB_SCOPES.has(normalized.githubScope)) {
     normalized.githubScope = defaults.githubScope;
@@ -101,6 +103,12 @@ export function validateInitSelections(input = {}) {
   ) {
     errors.push("Custom agent targets must start with acp:");
   }
+  if (
+    selections.agentMode === "pinned" &&
+    !selections.pinnedAgent.startsWith("acp:")
+  ) {
+    errors.push("Pinned agent targets must start with acp:");
+  }
   if (!VALID_SOURCES.has(selections.source)) {
     errors.push("Setup supports GitHub or skipping source setup only");
   }
@@ -128,31 +136,53 @@ function shellQuote(value) {
   return JSON.stringify(value);
 }
 
+// Friendly display names for the AI agent CLIs we can talk to. The acp:
+// target stays the source of truth; this is only what we show the user.
+const AGENT_NAMES = {
+  claude: "Claude",
+  codex: "Codex",
+  opencode: "OpenCode",
+};
+
+function agentName(spec) {
+  if (typeof spec !== "string" || spec.length === 0) {
+    return "your AI agent";
+  }
+  const id = spec.startsWith("acp:") ? spec.slice(4) : spec;
+  return AGENT_NAMES[id] ?? id;
+}
+
 export function buildInitApplyPlan(input = {}, context = {}) {
   const selections = normalizeSelections(input);
   const configValue =
-    selections.agentMode === "custom" ? selections.customAgent : null;
-  const agentLabel =
     selections.agentMode === "custom"
       ? selections.customAgent
-      : context.detectedAgent?.spec
-        ? `auto (${context.detectedAgent.spec})`
-        : "auto-detect provider CLI";
+      : selections.agentMode === "pinned"
+        ? selections.pinnedAgent
+        : null;
+  const agentLabel =
+    selections.agentMode === "custom"
+      ? agentName(selections.customAgent)
+      : selections.agentMode === "pinned"
+        ? agentName(selections.pinnedAgent)
+        : context.detectedAgent?.spec
+          ? `${agentName(context.detectedAgent.spec)} (auto-detected)`
+          : "an auto-detected agent";
   const sourceConfig = githubConfig(selections);
   const commands = ["firstpass"];
   const sideEffects = [
     {
       id: "state",
-      label: `Create or reuse ${context.stateDir ?? "the FirstPass state dir"}`,
+      label: `Store your data in ${context.stateDir ?? "the FirstPass folder"}`,
     },
-    { id: "database", label: "Create or migrate firstpass.sqlite" },
-    { id: "config", label: `Set agent to ${agentLabel}` },
+    { id: "database", label: "Set up your local inbox" },
+    { id: "config", label: `Use ${agentLabel} for recommendations` },
   ];
 
   if (selections.source === "github") {
     sideEffects.push({
       id: "github",
-      label: "Install and configure the bundled GitHub source",
+      label: "Connect your GitHub repositories",
     });
     commands.unshift("firstpass plugin add github");
     commands.unshift(
@@ -169,22 +199,15 @@ export function buildInitApplyPlan(input = {}, context = {}) {
   if (selections.installService) {
     sideEffects.push({
       id: "service",
-      label: context.serviceManager
-        ? `Install ${context.serviceManager} login service and start it now`
-        : "Install the managed login service and start it now",
+      label: "Start FirstPass now and launch it automatically at startup",
     });
     commands.unshift("firstpass daemon install");
   } else if (selections.startDaemon) {
     sideEffects.push({
       id: "daemon-start",
-      label: "Start the daemon for this login session",
+      label: "Start FirstPass for this session",
     });
     commands.unshift("firstpass daemon start");
-  }
-
-  if (selections.runFirstSync) {
-    sideEffects.push({ id: "sync", label: "Ask the daemon to sync now" });
-    commands.unshift("firstpass sync");
   }
 
   return {
@@ -208,7 +231,6 @@ export function buildInitApplyPlan(input = {}, context = {}) {
       installService: Boolean(selections.installService),
       startDaemon: Boolean(selections.startDaemon),
     },
-    firstRun: { syncNow: Boolean(selections.runFirstSync) },
     sideEffects,
     commands: [...new Set(commands.reverse())],
     trustBoundaries: [
@@ -230,39 +252,65 @@ function stepStatus(step, currentStep) {
 }
 
 function agentScreen(selections, context) {
+  const detected = Array.isArray(context.detectedAgents)
+    ? context.detectedAgents
+    : [];
+  const firstSpec = context.detectedAgent?.spec ?? detected[0]?.spec ?? null;
+  const firstName = agentName(firstSpec);
+  const otherNames = detected
+    .map((agent) => agentName(agent.spec))
+    .filter((name) => name !== firstName);
+  let autoDetail;
+  if (!firstSpec) {
+    autoDetail = "We'll use Claude, Codex, or OpenCode if one is installed.";
+  } else if (otherNames.length > 0) {
+    autoDetail = `Will use ${firstName}. Also available: ${otherNames.join(", ")}.`;
+  } else {
+    autoDetail = `Will use ${firstName}.`;
+  }
+  const choices = [
+    {
+      id: "auto",
+      label: "Detect automatically",
+      detail: autoDetail,
+      selected: selections.agentMode === "auto",
+    },
+  ];
+  for (const agent of detected) {
+    const name = agentName(agent.spec);
+    choices.push({
+      id: agent.spec,
+      label: `Always use ${name}`,
+      detail: `${name} is installed on your computer.`,
+      selected:
+        selections.agentMode === "pinned" &&
+        selections.pinnedAgent === agent.spec,
+    });
+  }
+  choices.push({
+    id: "custom",
+    label: "Enter a custom command",
+    detail: selections.customAgent || "Advanced: provide an acp: target.",
+    selected: selections.agentMode === "custom",
+  });
   return {
-    heading: "Agent Boundary",
+    heading: "AI Agent",
     body: [
-      "Recommendations are produced through ACP.",
-      "Prompt context can include source-derived issue or pull request details.",
-      "Next you can connect GitHub or skip source setup.",
+      "FirstPass uses an AI agent on your computer to draft recommendations.",
+      "It may share details from your synced issues and pull requests with that agent.",
+      "Next, connect GitHub or skip source setup for now.",
     ],
-    choices: [
-      {
-        id: "auto",
-        label: "Auto-detect provider CLI",
-        detail: context.detectedAgent?.spec
-          ? `Detected ${context.detectedAgent.spec} from PATH.`
-          : "Use claude, codex, or opencode when found on PATH.",
-        selected: selections.agentMode === "auto",
-      },
-      {
-        id: "custom",
-        label: "Custom ACP target",
-        detail: selections.customAgent || "Use acp:<target-or-command>.",
-        selected: selections.agentMode === "custom",
-      },
-    ],
+    choices,
   };
 }
 
 function sourceScreen(selections) {
-  if (selections.source === "github") {
+  if (selections.sourceStage === "github") {
     return {
-      heading: "GitHub Source",
+      heading: "Connect GitHub",
       body: [
-        "GitHub is the only user-facing bundled source in setup.",
-        "Use gh auth status first; run gh auth login if credentials are missing.",
+        "Choose which repositories or activity FirstPass should sync.",
+        "Make sure you're signed in to GitHub first (gh auth login).",
       ],
       choices: Object.entries(GITHUB_SCOPE_LABELS).map(([id, label]) => ({
         id,
@@ -272,7 +320,7 @@ function sourceScreen(selections) {
             ? selections.githubRepos.length > 0
               ? selections.githubRepos.join(", ")
               : "Enter owner/repo below."
-            : "The GitHub plugin resolves this scope during sync.",
+            : "FirstPass figures this out when it syncs.",
         selected: selections.githubScope === id,
       })),
       input:
@@ -287,95 +335,62 @@ function sourceScreen(selections) {
     };
   }
   return {
-    heading: "First Source",
+    heading: "Connect a Source",
     body: [
-      "Choose GitHub setup or skip source setup for now.",
-      "Internal test sources are not shown in the first-run wizard.",
+      "Connect GitHub to sync your issues and pull requests, or skip for now.",
+      "You can always add a source later.",
     ],
     choices: [
       {
         id: "github",
         label: "GitHub",
-        detail: "Sync issues and pull requests through the gh CLI.",
-        selected: false,
+        detail: "Sync your issues and pull requests.",
+        selected: selections.source === "github",
       },
       {
         id: "skip",
-        label: "Skip source setup",
-        detail: "Initialize local state now and configure sources later.",
-        selected: true,
+        label: "Skip for now",
+        detail: "Set up FirstPass locally and add a source later.",
+        selected: selections.source !== "github",
       },
     ],
   };
 }
 
 function screenFor(selections, context, plan) {
-  if (selections.currentStep === "core") {
-    return {
-      heading: "Local State",
-      body: [
-        `State dir: ${context.stateDir ?? "~/.firstpass"}`,
-        context.dbExists
-          ? "Database already exists."
-          : "Database will be created.",
-        context.configExists
-          ? "Config already exists."
-          : "Config will be written.",
-      ],
-      choices: [],
-    };
-  }
   if (selections.currentStep === "agent")
     return agentScreen(selections, context);
   if (selections.currentStep === "source") return sourceScreen(selections);
-  if (selections.currentStep === "daemon") {
-    return {
-      heading: "Daemon",
-      body: [
-        "The daemon is the sole worker for sync, triage, and approved actions.",
-        "The default installs a managed login service and starts it now.",
-      ],
-      choices: [
-        {
-          id: "install-service",
-          label: "Install managed service",
-          detail: context.serviceManager ?? "launchd, systemd, or schtasks",
-          selected: selections.installService,
-        },
-        {
-          id: "skip-service",
-          label: "Do not install service",
-          detail: "You can run firstpass daemon start later.",
-          selected: !selections.installService,
-        },
-      ],
-    };
-  }
-  if (selections.currentStep === "apply") {
-    return {
-      heading: "Review And Apply",
-      body: plan.sideEffects.map((effect) => effect.label),
-      choices: [],
-    };
-  }
+  // Final step: review everything that will happen, and choose whether to run
+  // FirstPass in the background. That choice (the radios below) drives the
+  // service/session daemon, so its side effect is left out of the reviewed list
+  // to avoid restating it.
   return {
-    heading: "First Run",
-    body: [
-      "Setup can finish with commands for you to run next.",
-      "Run firstpass to open the inbox after the daemon has synced items.",
-    ],
+    heading: "Review & Finish",
+    body: plan.sideEffects
+      .filter(
+        (effect) => effect.id !== "service" && effect.id !== "daemon-start",
+      )
+      .map((effect) => effect.label),
     choices: [
       {
-        id: "sync-now",
-        label: "Request first sync now",
-        detail: "Only after the ACP and source disclosures above.",
-        selected: selections.runFirstSync,
+        id: "service",
+        label: "Start now & launch at login",
+        detail:
+          "Recommended. Syncs in the background now and after every restart.",
+        selected: selections.installService,
       },
       {
-        id: "finish",
-        label: "Finish with commands",
-        detail: "Run firstpass sync yourself when ready.",
-        selected: !selections.runFirstSync,
+        id: "session",
+        label: "Start now (this session only)",
+        detail: "Runs in the background until you restart your computer.",
+        selected: !selections.installService && selections.startDaemon,
+      },
+      {
+        id: "none",
+        label: "Don't start it yet",
+        detail: "You can start FirstPass yourself later.",
+        selected: !selections.installService && !selections.startDaemon,
       },
     ],
   };

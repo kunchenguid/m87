@@ -138,11 +138,15 @@ function Screen({ model, width, height }) {
           Box,
           { key: "input", marginTop: 1, flexDirection: "row" },
           h(Text, { color: theme.accent }, `${screen.input.label}: `),
-          h(
-            Text,
-            { color: screen.input.value ? theme.fg : theme.dim },
-            screen.input.value || screen.input.placeholder,
-          ),
+          screen.input.value
+            ? h(Text, { color: theme.fg }, screen.input.value)
+            : null,
+          // Steady block cursor (normal text color) marks this as an editable
+          // field awaiting input.
+          h(Text, { color: theme.fg }, "█"),
+          screen.input.value
+            ? null
+            : h(Text, { color: theme.dim }, screen.input.placeholder),
         )
       : null,
     ...screen.choices.map((choice) =>

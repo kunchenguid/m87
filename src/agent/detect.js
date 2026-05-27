@@ -54,13 +54,22 @@ function binaryExistsOnPath(binary, probePath) {
   return false;
 }
 
-export function detectAgentSpec(probePath = getAgentProbePath()) {
+/**
+ * Return every known provider CLI present on the probe path, in AUTODETECT
+ * order, as { spec, id } entries.
+ */
+export function detectAgentSpecs(probePath = getAgentProbePath()) {
+  const found = [];
   for (const entry of AUTODETECT_ORDER) {
     if (binaryExistsOnPath(entry.binary, probePath)) {
-      return { spec: `acp:${entry.id}`, id: entry.id };
+      found.push({ spec: `acp:${entry.id}`, id: entry.id });
     }
   }
-  return null;
+  return found;
+}
+
+export function detectAgentSpec(probePath = getAgentProbePath()) {
+  return detectAgentSpecs(probePath)[0] ?? null;
 }
 
 /**

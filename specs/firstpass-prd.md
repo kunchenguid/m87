@@ -116,9 +116,9 @@ firstpass init
 firstpass
 ```
 
-The first-run setup wizard initializes local state, discloses the ACP agent boundary, offers GitHub or skip source setup, and defaults to installing the managed daemon service.
+The first-run setup wizard initializes local state, lets the user use auto-detect or pick a detected AI agent, offers GitHub or skip source setup, and finishes with a background-run choice: launch at login, this session only, or not yet.
 Scripted setup uses `firstpass init --yes --plugin github --github-repo owner/repo`, or `--plugin skip` when a source should be configured later.
-The exact installation mechanism can vary, but the conceptual model is stable: core first, then an optional configured plugin.
+The interactive flow is agent choice, source choice, then review and finish.
 A configured plugin is the unit of scope; there is no separate source-account object.
 
 ### Inbox And Detail

@@ -26,20 +26,25 @@ function selectedChoiceIndex(choices) {
 
 function applyChoice(state, choiceId) {
   if (state.currentStep === "agent") {
-    return { ...state, agentMode: choiceId };
+    if (choiceId === "auto" || choiceId === "custom") {
+      return { ...state, agentMode: choiceId };
+    }
+    return { ...state, agentMode: "pinned", pinnedAgent: choiceId };
   }
   if (state.currentStep === "source") {
-    if (state.source === "github") {
+    if (state.sourceStage === "github") {
       return { ...state, githubScope: choiceId };
     }
     return { ...state, source: choiceId };
   }
-  if (state.currentStep === "daemon") {
-    const installService = choiceId === "install-service";
-    return { ...state, installService, startDaemon: installService };
-  }
-  if (state.currentStep === "first-run") {
-    return { ...state, runFirstSync: choiceId === "sync-now" };
+  if (state.currentStep === "review") {
+    if (choiceId === "service") {
+      return { ...state, installService: true, startDaemon: true };
+    }
+    if (choiceId === "session") {
+      return { ...state, installService: false, startDaemon: true };
+    }
+    return { ...state, installService: false, startDaemon: false };
   }
   return state;
 }
@@ -68,7 +73,7 @@ function appendActiveTextInput(state, input) {
   }
   if (
     state.currentStep === "source" &&
-    state.source === "github" &&
+    state.sourceStage === "github" &&
     state.githubScope === "explicit"
   ) {
     return {
@@ -118,8 +123,11 @@ function InitWizardApp({ context, initialSelections, onSubmit, onCancel }) {
     }
     if (input === "b") {
       setState((current) => {
-        if (current.currentStep === "source" && current.source === "github") {
-          return { ...current, source: "skip", notice: "" };
+        if (
+          current.currentStep === "source" &&
+          current.sourceStage === "github"
+        ) {
+          return { ...current, sourceStage: "choose", notice: "" };
         }
         return {
           ...current,
@@ -152,7 +160,7 @@ function InitWizardApp({ context, initialSelections, onSubmit, onCancel }) {
         }
         if (
           current.currentStep === "source" &&
-          current.source === "github" &&
+          current.sourceStage === "github" &&
           current.githubScope === "explicit"
         ) {
           return {
@@ -167,15 +175,25 @@ function InitWizardApp({ context, initialSelections, onSubmit, onCancel }) {
     }
     if (key.return) {
       const committed = commitInputs(state);
-      if (committed.currentStep === "first-run") {
+      if (committed.currentStep === "review") {
         finishSubmit(committed);
         return;
       }
-      if (committed.currentStep === "source" && committed.source === "github") {
-        const errors = validateInitSelections(committed);
-        if (errors.length > 0) {
-          setState({ ...committed, notice: errors[0] });
+      if (committed.currentStep === "source") {
+        if (
+          committed.sourceStage !== "github" &&
+          committed.source === "github"
+        ) {
+          // Confirming GitHub opens its scope config rather than advancing.
+          setState({ ...committed, sourceStage: "github", notice: "" });
           return;
+        }
+        if (committed.sourceStage === "github") {
+          const errors = validateInitSelections(committed);
+          if (errors.length > 0) {
+            setState({ ...committed, notice: errors[0] });
+            return;
+          }
         }
       }
       setState({

@@ -9,6 +9,8 @@ import Database from "better-sqlite3";
 import yaml from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { waitFor } from "../support/e2e-harness.js";
+
 const execFileAsync = promisify(execFile);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
@@ -146,6 +148,27 @@ describe("e2e: init wizard command contract", () => {
       db.close();
     }
   });
+
+  it("starts a background daemon with --start-daemon and leaves it running", async () => {
+    const result = parse(
+      await firstpass(
+        "init",
+        "--yes",
+        "--no-install-service",
+        "--start-daemon",
+      ),
+    );
+    expect(result.daemon).toMatchObject({ status: "started" });
+
+    // The detached daemon needs a moment to boot and advertise its pidfile;
+    // once up, it keeps running after the init command returns.
+    await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
+    const status = parse(await firstpass("daemon", "status"));
+    expect(status.running).toBe(true);
+
+    // Clean up the detached daemon so it does not outlive the test.
+    await firstpass("daemon", "stop");
+  }, 30000);
 
   it("does not allow internal test plugins through setup", async () => {
     const err = await firstpass(
