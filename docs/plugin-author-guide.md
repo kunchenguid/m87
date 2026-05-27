@@ -116,7 +116,7 @@ If writes are optional, document how users can configure read-only credentials a
 Never store secrets in FirstPass core config unless a source makes that unavoidable.
 Prefer source CLIs, OS keychain storage, OAuth token stores, or plugin-owned encrypted files.
 
-Keep provenance, requested scopes, capabilities, and the action catalog current so users can inspect what the plugin can access and do.
+Keep provenance, requested scopes, capabilities, and the action catalog current so the manifest accurately describes what the plugin can access and do.
 
 ## Sync Semantics
 
@@ -180,7 +180,7 @@ When the source does not support client tokens, use natural keys or other best-e
 - Keep action schemas small and strict with `additionalProperties: false` when possible.
 - Return stable item ids, event ids, evidence ids, and source URLs.
 - Treat cursors as opaque plugin-owned state and make sync idempotent.
-- Disclose all credential scopes and trust metadata so users can inspect the plugin before installation.
+- Disclose all credential scopes and trust metadata accurately in the manifest.
 - Prefer drafts or private source state over visible sends when the source supports it.
 - Validate and preview every remote action immediately before execution.
 - Avoid logging secrets to stderr because users may still choose to share raw plugin logs.

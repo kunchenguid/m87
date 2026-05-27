@@ -271,8 +271,8 @@ The approval boundary protects users from agent-selected actions executed by hon
 
 MVP must make that tradeoff visible instead of pretending it is solved by the protocol.
 This is disclosure and consent, not sandbox enforcement.
-Plugin setup shows the plugin binary path, resolved version, manifest publisher, requested source scopes, declared capabilities, action safety levels, and install source so users can inspect what a plugin can access and do.
-First-party plugins can be marked as bundled or verified, but the UI still shows their source scopes and write-capable actions.
+Plugin manifests record the plugin binary path, resolved version, manifest publisher, requested source scopes, declared capabilities, action safety levels, and install source so users can understand what a plugin can access and do.
+First-party plugins can be marked as bundled or verified, but their manifests still include source scopes and write-capable actions.
 
 The product should educate users to prefer the narrowest practical source credentials, inspect OAuth scopes before authorizing a plugin, avoid untrusted third-party plugins for sensitive accounts, and disable write scopes if they only want read-only recommendations.
 Requiring separate read and write credentials is not an MVP requirement because that adds too much setup friction.
@@ -550,7 +550,7 @@ Plugin discovery order:
 The plugin command should be stable enough for third-party plugins in any language.
 First-party plugins can be bundled later, but the protocol should not require Go.
 Discovery does not imply provenance or safety.
-The core should show plugin source, scope, capability, and action metadata so users can review it before installation and configuration.
+The core should store plugin source, scope, capability, and action metadata for installed plugins.
 
 ## Security, Privacy, And Observability
 
@@ -560,7 +560,7 @@ Requirements:
 - Gate remote writes on approval.
 - Show exact outgoing text before approval.
 - Store action audit records.
-- Show plugin source, scope, and capability information before plugin installation and configuration.
+- Store plugin source, scope, and capability information from installed plugin manifests.
 - Avoid logging secrets.
 - Redact plugin stderr in user-facing bug reports unless the user opts in.
 - Let users configure retention for raw source context.
