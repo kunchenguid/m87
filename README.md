@@ -169,9 +169,9 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 | `init`                     | `--github-public-owned`       | Sync public repositories owned by the user            |
 | `init`                     | `--github-public-starred`     | Sync public owned repositories starred by user        |
 | `init`                     | `--github-authored-external`  | Sync authored issues and PRs outside configured repos |
-| `init`                     | `--install-service`           | Install the managed daemon service                    |
-| `init`                     | `--no-install-service`        | Opt out of the managed daemon service                 |
-| `init`                     | `--start-daemon`              | Start a detached daemon without a service             |
+| `init`                     | `--install-service`           | Start now and launch at login                         |
+| `init`                     | `--no-install-service`        | Do not start in the background yet                    |
+| `init`                     | `--start-daemon`              | Start now for this session only                       |
 | `preview`                  | `--option <selector>`         | Pick an option by id or position                      |
 | `approve`                  | `--option <selector>`         | Pick an option by id or position                      |
 | `approve`                  | `--confirm`                   | Confirm external-write actions                        |
