@@ -216,6 +216,10 @@ export function startInitWizardTui(opts = {}) {
     }),
     { stdout, stdin, patchConsole: false },
   );
+  void instance.waitUntilExit().then(
+    () => resolveResult(null),
+    () => resolveResult(null),
+  );
   return { instance, restore, result };
 }
 

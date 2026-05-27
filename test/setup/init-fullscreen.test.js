@@ -80,4 +80,27 @@ describe("setup/init fullscreen wizard", () => {
       restore();
     }
   });
+
+  it("resolves as cancelled when the wizard exits without submitting", async () => {
+    const stdout = new FakeStdout();
+    const stdin = new FakeStdin();
+    const { instance, restore, result } = startInitWizardTui({
+      stdout: /** @type {any} */ (stdout),
+      stdin: /** @type {any} */ (stdin),
+      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+    });
+
+    try {
+      instance.unmount();
+      await instance.waitUntilExit();
+
+      const resolved = await Promise.race([
+        result,
+        sleep(200).then(() => "pending"),
+      ]);
+      expect(resolved).toBeNull();
+    } finally {
+      restore();
+    }
+  });
 });
