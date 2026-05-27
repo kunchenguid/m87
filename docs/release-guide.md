@@ -31,13 +31,26 @@ node src/cli/index.js status
 
 ## Initial Setup
 
-Initialize local configuration and state:
+Run the guided setup in an interactive terminal:
 
 ```sh
 firstpass init
 firstpass status
 ```
 
+The wizard initializes local state, discloses the ACP agent boundary, offers GitHub or skip source setup, and defaults to installing the managed daemon service.
+For CI, release validation, or agent-driven setup, use headless flags instead:
+
+```sh
+firstpass init --yes \
+  --agent auto \
+  --plugin github \
+  --github-repo <owner>/<repo> \
+  --no-install-service
+firstpass status
+```
+
+Use `--wizard` to force the interactive wizard, or `--plugin skip` when validating local state without a source.
 By default, FirstPass reads configuration and stores local state under `~/.firstpass`.
 Set `FIRSTPASS_STATE_DIR` to use a different state directory.
 The status command reports configured state, agent target and source, installed plugin sync health, local item counts, queue counts, and audit event count.
@@ -134,9 +147,9 @@ The first GitHub workflow is intentionally approval-first.
 FirstPass can sync GitHub items, generate local recommendations, preview actions, and execute only after explicit approval.
 
 1. Ensure GitHub credentials are available through the GitHub plugin's supported credential path.
-2. Install the GitHub plugin.
-3. Configure the GitHub source.
-4. Start the daemon and run sync.
+2. Run setup with GitHub selected.
+3. Install or start the daemon through setup.
+4. Run sync.
 5. Review the queue.
 6. Triage an item.
 7. Inspect the recommendation and evidence.
@@ -146,11 +159,9 @@ FirstPass can sync GitHub items, generate local recommendations, preview actions
 Commands:
 
 ```sh
-firstpass plugin add github
-firstpass plugin configure github \
-  --config username=<github-login> \
-  --config explicit_repos=<owner>/<repo>
-firstpass daemon start
+firstpass init --yes \
+  --plugin github \
+  --github-repo <owner>/<repo>
 firstpass sync
 firstpass list
 firstpass view <item-id>
@@ -161,7 +172,8 @@ firstpass approve <recommendation-id> --option <option-id> --confirm
 firstpass audit receipt <approval-id>
 ```
 
-Use `--config owned_repos=true` to sync source repositories for the configured username, or `--config authored_external=true` to sync recently updated issues and PRs authored by that user outside explicitly configured repositories.
+Manual `plugin add`, `plugin configure`, and `daemon start` remain available when you need to bypass setup.
+Use `--github-owned` to sync source repositories for `--github-username`, or `--github-authored-external` to sync recently updated issues and PRs authored by that user outside explicitly configured repositories.
 GitHub approvals can create real comments, reviews, close/reopen state changes, and other source-visible effects declared by the plugin action catalog.
 Review `firstpass preview` output before running `firstpass approve`; destructive actions require the additional `--confirm-destructive` flag.
 
@@ -185,6 +197,6 @@ After publishing, verify a fresh global install on each supported Node and OS ta
 ```sh
 npm install -g firstpass
 firstpass --version
-firstpass init
+firstpass init --yes --plugin skip --no-install-service
 firstpass status
 ```

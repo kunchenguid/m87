@@ -157,22 +157,29 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 
 ### Flags
 
-| Command                    | Flag                    | Description                            |
-| -------------------------- | ----------------------- | -------------------------------------- |
-| `init`                     | `--yes`                 | Apply setup defaults without prompts   |
-| `init`                     | `--wizard`              | Force the interactive setup wizard     |
-| `init`                     | `--agent <target>`      | `auto` or an explicit `acp:<target>`   |
-| `init`                     | `--plugin github`       | Configure the bundled GitHub source    |
-| `init`                     | `--github-repo <repo>`  | Sync an explicit `owner/repo` source   |
-| `init`                     | `--no-install-service`  | Opt out of the managed daemon service  |
-| `preview`                  | `--option <selector>`   | Pick an option by id or position       |
-| `approve`                  | `--option <selector>`   | Pick an option by id or position       |
-| `approve`                  | `--confirm`             | Confirm external-write actions         |
-| `approve`                  | `--confirm-destructive` | Confirm destructive actions            |
-| `rerun`                    | `--instructions <text>` | Extra instructions for the agent       |
-| `plugin add` / `configure` | `--config <k=v...>`     | Set plugin configuration pairs         |
-| `daemon run`               | `--once`                | Process the queue once and exit        |
-| `update`                   | `--check`               | Only check the registry; never install |
+| Command                    | Flag                          | Description                                           |
+| -------------------------- | ----------------------------- | ----------------------------------------------------- |
+| `init`                     | `--yes`                       | Apply setup defaults without prompts                  |
+| `init`                     | `--wizard`                    | Force the interactive setup wizard                    |
+| `init`                     | `--agent <target>`            | `auto` or an explicit `acp:<target>`                  |
+| `init`                     | `--plugin github\|skip\|none` | Configure GitHub or skip source setup                 |
+| `init`                     | `--github-repo <repo...>`     | Sync explicit `owner/repo` sources                    |
+| `init`                     | `--github-username <login>`   | GitHub login for discovered scopes                    |
+| `init`                     | `--github-owned`              | Sync repositories owned by the GitHub user            |
+| `init`                     | `--github-public-owned`       | Sync public repositories owned by the user            |
+| `init`                     | `--github-public-starred`     | Sync public owned repositories starred by user        |
+| `init`                     | `--github-authored-external`  | Sync authored issues and PRs outside configured repos |
+| `init`                     | `--install-service`           | Install the managed daemon service                    |
+| `init`                     | `--no-install-service`        | Opt out of the managed daemon service                 |
+| `init`                     | `--start-daemon`              | Start a detached daemon without a service             |
+| `preview`                  | `--option <selector>`         | Pick an option by id or position                      |
+| `approve`                  | `--option <selector>`         | Pick an option by id or position                      |
+| `approve`                  | `--confirm`                   | Confirm external-write actions                        |
+| `approve`                  | `--confirm-destructive`       | Confirm destructive actions                           |
+| `rerun`                    | `--instructions <text>`       | Extra instructions for the agent                      |
+| `plugin add` / `configure` | `--config <k=v...>`           | Set plugin configuration pairs                        |
+| `daemon run`               | `--once`                      | Process the queue once and exit                       |
+| `update`                   | `--check`                     | Only check the registry; never install                |
 
 ## Sources
 

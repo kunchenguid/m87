@@ -113,13 +113,12 @@ Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as
 
 ```sh
 firstpass init
-firstpass plugin add github
-firstpass plugin configure github --config explicit_repos=owner/repo
-firstpass daemon start
 firstpass
 ```
 
-The exact installation mechanism can vary, but the conceptual model is stable: core first, then a configured plugin.
+The first-run setup wizard initializes local state, discloses the ACP agent boundary, offers GitHub or skip source setup, and defaults to installing the managed daemon service.
+Scripted setup uses `firstpass init --yes --plugin github --github-repo owner/repo`, or `--plugin skip` when a source should be configured later.
+The exact installation mechanism can vary, but the conceptual model is stable: core first, then an optional configured plugin.
 A configured plugin is the unit of scope; there is no separate source-account object.
 
 ### Inbox And Detail
