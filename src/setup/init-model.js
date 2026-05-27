@@ -368,7 +368,9 @@ function screenFor(selections, context, plan) {
   return {
     heading: "Review & Finish",
     body: plan.sideEffects
-      .filter((effect) => effect.id !== "service" && effect.id !== "daemon-start")
+      .filter(
+        (effect) => effect.id !== "service" && effect.id !== "daemon-start",
+      )
       .map((effect) => effect.label),
     choices: [
       {

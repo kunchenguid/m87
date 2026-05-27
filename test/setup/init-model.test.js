@@ -196,15 +196,19 @@ describe("setup/init model", () => {
       mode: "pinned",
       configValue: "acp:codex",
     });
-    expect(plan.sideEffects.find((effect) => effect.id === "config").label).toBe(
-      "Use Codex for recommendations",
-    );
+    expect(
+      plan.sideEffects.find((effect) => effect.id === "config").label,
+    ).toBe("Use Codex for recommendations");
     expect(validateInitSelections(selections)).toEqual([]);
   });
 
   it("combines the reviewed actions and the background-run choice on one screen", () => {
     const model = buildInitWizardModel(
-      { ...defaultInitSelections(), currentStep: "review", installService: true },
+      {
+        ...defaultInitSelections(),
+        currentStep: "review",
+        installService: true,
+      },
       context,
     );
     expect(model.screen.heading).toBe("Review & Finish");
@@ -300,9 +304,10 @@ describe("setup/init model", () => {
         .join("\n")
         .toLowerCase();
       for (const term of jargon) {
-        expect(text, `step ${selections.currentStep} leaks "${term}"`).not.toContain(
-          term,
-        );
+        expect(
+          text,
+          `step ${selections.currentStep} leaks "${term}"`,
+        ).not.toContain(term);
       }
     }
   });

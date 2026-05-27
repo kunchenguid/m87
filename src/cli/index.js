@@ -357,10 +357,7 @@ program
   )
   .option("--install-service", "start now and launch at login")
   .option("--no-install-service", "do not start in the background yet")
-  .option(
-    "--start-daemon",
-    "start now for this session only",
-  )
+  .option("--start-daemon", "start now for this session only")
   .action(async (options) => {
     const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
     if (options.wizard && !tty) {
