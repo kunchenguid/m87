@@ -147,6 +147,7 @@ Safety levels are:
 The core passes the plugin's scope `config` (never an `account_id`) to `fetch`, `validate-action`, `preview-action`, `execute-action`, and the automation-workspace commands; plugins that only need the external tool's own auth may ignore it.
 `validate-action` must reject malformed payloads and should warn when source state changed since recommendation time.
 `preview-action` should show the exact outgoing text or source effect before approval.
+The TUI also builds a pre-approval WILL DO summary from action params; use plain visible payload names such as `body`, `text`, `message`, `comment`, or `labels` so users can review the selected option clearly.
 `execute-action` receives an `approval_id` and `idempotency_key` and should return `succeeded`, `failed`, or `already_applied`.
 Use the idempotency key whenever the source supports client tokens.
 When the source does not support client tokens, use natural keys or other best-effort checks and document that behavior in `idempotency`.

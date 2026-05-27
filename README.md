@@ -111,12 +111,13 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
         items ───────► agent triage (ACP) ───────► recommendation
                                                          │
                                                          ▼
-                                                   inbox / list
-                                                         │
-                                            preview  ◄───┘  (the gate)
-                                                │
-                                          approve --confirm
-                                                │
+                                                    inbox / list
+                                                          │
+                                      preview / WILL DO  ◄─┘  (the gate)
+                                                 │
+                                         explicit approval
+                                  (TUI `a` or CLI `--confirm`)
+                                                 │
                               ┌─────────────────┴─────────────────┐
                               ▼                                   ▼
                       source-visible action              automation job (draft PR)
