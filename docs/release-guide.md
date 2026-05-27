@@ -38,7 +38,7 @@ firstpass init
 firstpass status
 ```
 
-The wizard initializes local state, discloses the ACP agent boundary, offers GitHub or skip source setup, and defaults to installing the managed daemon service.
+The wizard initializes local state, lets you use auto-detect or pick a detected AI agent, connects GitHub or skips source setup, and finishes by choosing whether FirstPass runs in the background at login, for this session only, or later.
 For CI, release validation, or agent-driven setup, use headless flags instead:
 
 ```sh

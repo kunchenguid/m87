@@ -56,7 +56,7 @@ Run the guided setup in a terminal:
 $ firstpass init
 ```
 
-The wizard creates local state, discloses the ACP agent boundary, offers GitHub or skip, and defaults to installing the managed daemon service.
+The wizard creates local state, lets you use auto-detect or pick a detected AI agent, connects GitHub or skips source setup, and finishes by choosing whether FirstPass runs in the background at login, for this session only, or later.
 For scripts or CI, use flags instead of prompts:
 
 ```sh
