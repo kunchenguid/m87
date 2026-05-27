@@ -17,7 +17,7 @@ Supported commands are:
 
 | Command                        | Purpose                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `manifest`                     | Return source identity, trust metadata, requested scopes, capabilities, item types, and action catalog. |
+| `manifest`                     | Return source identity, capabilities, item types, and action catalog.                                   |
 | `doctor`                       | Report local readiness checks and warnings.                                                             |
 | `configure`                    | Resolve source credentials and return the plugin's derived display name.                                |
 | `sync`                         | Return recent item events, fingerprint progress, and sync status.                                       |
@@ -43,13 +43,11 @@ Protocol-required top-level fields are:
 
 Recommended top-level metadata fields are:
 
-| Field              | Meaning                                                               |
-| ------------------ | --------------------------------------------------------------------- |
-| `trust`            | Distribution and provenance metadata.                                 |
-| `requested_scopes` | Array of source credential scopes and human-readable purposes.        |
-| `capabilities`     | Array of declared capability metadata.                                |
-| `item_types`       | Source item type ids and display names.                               |
-| `action_types`     | Action catalog available to agent recommendations and approval flows. |
+| Field          | Meaning                                                               |
+| -------------- | --------------------------------------------------------------------- |
+| `capabilities` | Array of declared capability metadata.                                |
+| `item_types`   | Source item type ids and display names.                               |
+| `action_types` | Action catalog available to agent recommendations and approval flows. |
 
 Example:
 
@@ -62,21 +60,6 @@ Example:
     "display_name": "Tickets",
     "publisher": "Example Inc."
   },
-  "trust": {
-    "third_party": true,
-    "distribution": "npm",
-    "package": "firstpass-src-tickets"
-  },
-  "requested_scopes": [
-    {
-      "scope": "tickets:read",
-      "purpose": "Read tickets, comments, and status changes that may need attention."
-    },
-    {
-      "scope": "tickets:write",
-      "purpose": "Create approved replies or private notes after explicit user approval."
-    }
-  ],
   "capabilities": ["sync", "fetch", "actions", "automation"],
   "item_types": [{ "type": "ticket", "display_name": "Ticket" }],
   "action_types": [
@@ -98,23 +81,22 @@ Example:
 }
 ```
 
-## Trust Metadata And Scopes
+## Plugin Trust And Scopes
 
 Plugin code is not a sandbox boundary.
 A plugin can use any credentials it can access, including outside commands that are nominally read-only.
 The approval boundary protects users from agent-selected actions executed by honest plugins, not from malicious plugin code.
 
-Use `trust` to make provenance clear.
-First-party bundled plugins can use metadata such as `{ "first_party": true, "bundled": true }`.
-Third-party plugins should include the package manager, package name, explicit binary path, repository URL, or other install source that helps a user decide whether to trust the executable.
+Document provenance clearly outside the manifest.
+Third-party plugins should document the package manager, package name, explicit binary path, repository URL, or other install source that helps a user decide whether to trust the executable.
 
-Use `requested_scopes` to disclose every source credential scope the plugin expects.
+Disclose every source credential scope the plugin expects in setup documentation.
 Prefer the narrowest practical credential guidance.
 If writes are optional, document how users can configure read-only credentials and what capabilities will be unavailable.
 Never store secrets in FirstPass core config unless a source makes that unavoidable.
 Prefer source CLIs, OS keychain storage, OAuth token stores, or plugin-owned encrypted files.
 
-Keep provenance, requested scopes, capabilities, and the action catalog current so the manifest accurately describes what the plugin can access and do.
+Keep capabilities and the action catalog current so the manifest accurately describes what the plugin can do.
 
 ## Sync Semantics
 
@@ -175,7 +157,7 @@ When the source does not support client tokens, use natural keys or other best-e
 - Keep action schemas small and strict with `additionalProperties: false` when possible.
 - Return stable item ids, event ids, evidence ids, and source URLs.
 - Treat fingerprints as opaque plugin-owned state and make sync idempotent.
-- Disclose all credential scopes and trust metadata accurately in the manifest.
+- Disclose all credential scopes and provenance accurately in setup documentation.
 - Prefer drafts or private source state over visible sends when the source supports it.
 - Validate and preview every remote action immediately before execution.
 - Avoid logging secrets to stderr because users may still choose to share raw plugin logs.
