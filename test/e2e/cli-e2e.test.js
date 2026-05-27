@@ -110,11 +110,21 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
   it("mutating commands require a running daemon", async () => {
     await firstpass("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock", "--trust");
+    await firstpass("plugin", "add", "mock");
     // no daemon started yet
     const err = await firstpass("approve", "rec-x").catch((e) => e);
     expect(err.stderr).toContain("daemon not running");
     expect(err.code).toBe(1);
+  });
+
+  it("plugin add installs immediately with no trust gate", async () => {
+    await firstpass("init");
+    const added = parse(await firstpass("plugin", "add", "mock"));
+    expect(added.status).toBe("installed");
+    expect(added.plugin.id).toBe("mock");
+
+    const listed = parse(await firstpass("plugin", "list"));
+    expect(listed.installed.map((p) => p.id)).toContain("mock");
   });
 
   it("daemon status reports not_running when no daemon is up", async () => {
@@ -128,7 +138,7 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
   it("daemon syncs+triages; approve flows to handled via the event log", async () => {
     await firstpass("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock", "--trust");
+    await firstpass("plugin", "add", "mock");
 
     daemon = startFirstpassDaemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
@@ -206,7 +216,7 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
   it("dismiss flows through the daemon", async () => {
     await firstpass("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock", "--trust");
+    await firstpass("plugin", "add", "mock");
     daemon = startFirstpassDaemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
     await firstpass("sync");
@@ -224,7 +234,7 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
   it("a restarted daemon resumes from the persisted log and settles in-flight work", async () => {
     await firstpass("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock", "--trust");
+    await firstpass("plugin", "add", "mock");
 
     // first daemon: sync + triage an item into a live recommendation
     daemon = startFirstpassDaemon(env);
@@ -295,7 +305,7 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
         plugins: {},
       }),
     );
-    await firstpass("plugin", "add", "mock", "--trust");
+    await firstpass("plugin", "add", "mock");
 
     daemon = startFirstpassDaemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));

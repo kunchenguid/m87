@@ -64,7 +64,6 @@ create index queue_due on queue(status, lane, available_at);
 create table plugins (
   id text primary key,
   binary_path text not null,
-  binary_hash text,
   version text not null,
   protocol_version text not null,
   manifest_json text not null,

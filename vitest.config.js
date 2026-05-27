@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 // The heavy end-to-end tests spawn the real CLI as many separate `node`
-// processes (init, plugin add, source add, daemon, list, approve, ...) plus a
+// processes (init, plugin add, plugin configure, daemon, list, approve, ...) plus a
 // mocked ACP target. On a busy machine those legitimately exceed Vitest's
 // default 5s per-test budget, so raise it to keep the suite reliably green.
 export default defineConfig({

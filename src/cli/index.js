@@ -30,8 +30,6 @@ import { createDatabase } from "../core/database.js";
 import { makeEvent } from "../core/event.js";
 import { deadLetterCount, enqueue, pendingCount } from "../core/queue.js";
 import {
-  assertTrustUnchanged,
-  pluginBinaryHash,
   pluginConfigure,
   pluginDoctor,
   pluginPreviewAction,
@@ -246,7 +244,6 @@ const plugin = program.command("plugin").description("Manage source plugins");
 
 plugin
   .command("add <pluginId>")
-  .option("--trust", "trust and install the plugin")
   .option("--config <pair...>", "configuration key=value pairs")
   .description("Install a bundled source plugin")
   .action(async (pluginId, options) => {
@@ -255,28 +252,16 @@ plugin
       return fail(`unknown plugin: ${pluginId}`);
     }
     const manifest = await readManifest(binaryPath);
-    if (!options.trust) {
-      out({
-        status: "trust_required",
-        plugin: manifest.plugin,
-        requested_scopes: manifest.requested_scopes ?? [],
-        hint: `re-run with --trust to install ${pluginId}`,
-      });
-      process.exitCode = 1;
-      return;
-    }
     const { dbPath } = getStatePaths();
     const db = createDatabase(dbPath);
-    const hash = await pluginBinaryHash(binaryPath);
     const now = new Date().toISOString();
     const config = options.config ? parseConfigPairs(options.config) : {};
     db.prepare(
-      `insert or replace into plugins (id, binary_path, binary_hash, version, protocol_version, manifest_json, config_json, status, installed_at)
-       values (?,?,?,?,?,?,?, 'active', ?)`,
+      `insert or replace into plugins (id, binary_path, version, protocol_version, manifest_json, config_json, status, installed_at)
+       values (?,?,?,?,?,?, 'active', ?)`,
     ).run(
       manifest.plugin.id,
       binaryPath,
-      hash,
       manifest.plugin.version,
       manifest.protocol_version,
       JSON.stringify(manifest),
@@ -364,7 +349,6 @@ plugin
     const results = [];
     for (const record of records) {
       try {
-        await assertTrustUnchanged(record);
         const doctor = await pluginDoctor(
           record.binary_path,
           JSON.parse(record.config_json ?? "{}"),
@@ -1165,14 +1149,12 @@ state
         const binaryPath = bundledPluginPaths[p.id];
         if (!binaryPath || !existsSync(binaryPath)) continue;
         const manifest = await readManifest(binaryPath);
-        const hash = await pluginBinaryHash(binaryPath);
         db.prepare(
-          `insert or replace into plugins (id, binary_path, binary_hash, version, protocol_version, manifest_json, config_json, status, installed_at)
-           values (?,?,?,?,?,?, coalesce((select config_json from plugins where id=?), '{}'), 'active', ?)`,
+          `insert or replace into plugins (id, binary_path, version, protocol_version, manifest_json, config_json, status, installed_at)
+           values (?,?,?,?,?, coalesce((select config_json from plugins where id=?), '{}'), 'active', ?)`,
         ).run(
           manifest.plugin.id,
           binaryPath,
-          hash,
           manifest.plugin.version,
           manifest.protocol_version,
           JSON.stringify(manifest),

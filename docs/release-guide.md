@@ -1,11 +1,11 @@
 # FirstPass Release Guide
 
-This guide covers the first release path for installing FirstPass, configuring local state, trusting plugins, handling credentials, setting retention policy, choosing ACP targets, and running the first GitHub workflow.
+This guide covers the first release path for installing FirstPass, configuring local state, installing plugins, handling credentials, setting retention policy, choosing ACP targets, and running the first GitHub workflow.
 FirstPass is local-first: source data, recommendations, approvals, action receipts, and audit history are stored under the configured state directory unless explicitly exported.
 
 ## Install
 
-FirstPass requires Node.js 20 or newer.
+FirstPass requires Node.js 22.13 or newer.
 The package exposes the `firstpass` binary.
 
 For a published release, install it globally:
@@ -26,7 +26,7 @@ For local development before publishing, use the repository scripts instead:
 ```sh
 pnpm install
 pnpm run build
-node src/cli.js status
+node src/cli/index.js status
 ```
 
 ## Initial Setup
@@ -38,27 +38,21 @@ firstpass init
 firstpass status
 ```
 
-By default, FirstPass reads configuration from `~/.firstpass/config.yaml` and stores local state under the configured state directory.
-The status command reports configured state, installed plugins, source account health, ACP target disclosure, token usage summaries, and recent action failures.
+By default, FirstPass reads configuration and stores local state under `~/.firstpass`.
+Set `FIRSTPASS_STATE_DIR` to use a different state directory.
+The status command reports configured state, agent target and source, installed plugin sync health, local item counts, queue counts, and audit event count.
 
 Example minimal config:
 
 ```yaml
 agent: null
 poll_interval: 300
-state_dir: ~/.firstpass
 acp_registry_overrides: {}
-retention:
-  raw_context_ttl: 30d
-  prompt_ttl: 30d
-  draft_ttl: active
-  attachment_ttl: 7d
-  audit_ttl: keep
-sources: []
+plugins: {}
 ```
 
-`state_dir` controls the SQLite database, plugin install directory, ACP session directory, daemon PID file, and retained local artifacts.
-The config file itself remains at `~/.firstpass/config.yaml` so FirstPass can find the configured state directory.
+The state directory contains the SQLite database, plugin state, ACP session directory, daemon PID file, and retained local artifacts.
+Installed plugin configuration is stored with the plugin record.
 
 ## Plugin Trust
 
@@ -72,26 +66,25 @@ firstpass plugin list
 firstpass plugin doctor
 ```
 
-Install a discovered plugin only after reviewing the trust disclosure:
+Install a bundled plugin:
 
 ```sh
-firstpass plugin add <plugin-id>
-firstpass plugin add <plugin-id> --trust
+firstpass plugin add <mock|github|gmail>
 ```
 
-Trust prompts disclose publisher metadata, distribution metadata, requested scopes, action capabilities, and the binary path.
-FirstPass records the trusted manifest and reports drift through `firstpass plugin doctor` when publisher, version, scopes, capabilities, action catalog, or binary path metadata changes.
+`firstpass plugin doctor` health-checks installed plugins.
+This release only installs bundled plugins.
 
 ## Credentials
 
 Core FirstPass config should not contain source secrets.
 Prefer source-owned credential stores such as a source CLI, OAuth token store, OS keychain, or plugin-owned encrypted credential file.
 
-When adding a source account, follow the plugin disclosure and credential guidance:
+When configuring a source plugin, choose trusted bundled plugins and credential paths:
 
 ```sh
-firstpass source add <plugin-id>
-firstpass source add <plugin-id> --account <account-name> --trust
+firstpass plugin add <plugin-id>
+firstpass plugin configure <plugin-id> --config <key>=<value>
 ```
 
 Use the narrowest credential scope that supports the workflow you need.
@@ -99,13 +92,13 @@ If write credentials are optional, start with read-only credentials and enable w
 
 ## Retention
 
-Retention settings control how long FirstPass keeps raw source context, rendered context, prompt context, drafts, and attachment metadata.
-Audit-preserved approval and action history is retained separately so receipts remain available after context cleanup.
+Retention cleanup currently expires prompt context rows that have passed their TTL.
+Broader cleanup for raw source context, rendered context, drafts, attachments, and audit policy controls remains future work.
 
-Review retention policy in local status:
+Run retention cleanup before destructive maintenance when needed:
 
 ```sh
-firstpass status
+firstpass retention cleanup
 ```
 
 Export a portable state snapshot before destructive maintenance or machine migration:
@@ -115,27 +108,22 @@ firstpass state export > firstpass-state.json
 firstpass state import firstpass-state.json
 ```
 
-State export redacts source-account secrets and raw custom ACP command strings.
-Imported source accounts are marked for reconfiguration because redacted exports do not contain usable credentials.
+State export includes installed plugin identities and redacted core configuration.
+Redaction is key-name based for secret-like values; raw custom ACP command strings in `agent` config are not redacted, so do not include secrets in ACP command arguments.
+It does not export plugin configuration or credentials.
+Imported bundled plugins are reinstalled with existing local config if present, or empty config otherwise, so credentials must be supplied again when needed.
 
 ## ACP Targets
 
 FirstPass can route recommendation generation to an ACP-compatible target when configured.
 Hosted model targets should be treated as data-sharing boundaries because prompt context can include source-derived content.
 
-Use `firstpass status` to verify the currently configured ACP target and hosted-model disclosure before running triage.
-For sensitive source accounts, disable agent processing in config so items can sync without prompt-context generation:
+Use `firstpass status` to verify the currently configured ACP target before running triage.
+For sensitive sources, use a local ACP target or avoid running triage for plugins whose source content should not enter prompts.
 
-```yaml
-sources:
-  - id: github-work
-    agent_processing: false
-    policy: Prefer short maintainer replies and never recommend closing user bug reports without evidence.
-```
-
-Custom ACP command specs are redacted in status, item detail, and state export output.
 Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:mock-agent`, or a raw ACP server command string after `acp:`.
-Raw command targets are shown as `acp:custom` in status and audit surfaces.
+Status output shows the configured ACP target, including raw custom command strings.
+Avoid secrets in custom ACP commands; use environment variables or external credential stores instead.
 
 ## First GitHub Workflow
 
@@ -146,9 +134,9 @@ The first GitHub workflow is intentionally approval-first.
 FirstPass can sync GitHub items, generate local recommendations, preview actions, and execute only after explicit approval.
 
 1. Ensure GitHub credentials are available through the GitHub plugin's supported credential path.
-2. Install and trust the GitHub plugin.
-3. Add the GitHub source account.
-4. Run a one-shot sync.
+2. Install the GitHub plugin.
+3. Configure the GitHub source.
+4. Start the daemon and run sync.
 5. Review the queue.
 6. Triage an item.
 7. Inspect the recommendation and evidence.
@@ -158,19 +146,18 @@ FirstPass can sync GitHub items, generate local recommendations, preview actions
 Commands:
 
 ```sh
-firstpass plugin add github --trust
-firstpass source add github \
-  --account work \
-  --trust \
+firstpass plugin add github
+firstpass plugin configure github \
   --config username=<github-login> \
   --config explicit_repos=<owner>/<repo>
-firstpass source sync <source-account-id>
+firstpass daemon start
+firstpass sync
 firstpass list
 firstpass view <item-id>
 firstpass triage <item-id>
 firstpass view <item-id>
 firstpass preview <recommendation-id> --option <option-id>
-firstpass approve <recommendation-id> --option <option-id> --confirm-previewed
+firstpass approve <recommendation-id> --option <option-id> --confirm
 firstpass audit receipt <approval-id>
 ```
 

@@ -1,6 +1,4 @@
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 
 import { makeEvent } from "../core/event.js";
 import { itemId } from "../core/projections.js";
@@ -27,19 +25,11 @@ export class PluginError extends Error {
   }
 }
 
-export class PluginTrustDriftError extends Error {
-  constructor(pluginId, reason) {
-    super(reason);
-    this.name = "PluginTrustDriftError";
-    this.pluginId = pluginId;
-  }
-}
-
 /**
  * Spawn a plugin subprocess, hand it one JSON line on stdin, and parse one JSON
  * object from stdout. Falls back to `node <binary>` when the file isn't directly
- * executable (ENOEXEC). The trust boundary (invariant IV) lives here: plugins
- * are subprocesses that return data; they never drive control.
+ * executable (ENOEXEC). Plugins are subprocesses that return data; they never
+ * drive control.
  */
 export async function runPluginCommand(binaryPath, command, input) {
   const args = [command, "--protocol-version", PROTOCOL_VERSION];
@@ -104,27 +94,6 @@ async function runValidated(binaryPath, command, input, schema) {
     );
   }
   return result.data;
-}
-
-// --- trust -----------------------------------------------------------------
-
-export async function pluginBinaryHash(binaryPath) {
-  return createHash("sha256")
-    .update(await readFile(binaryPath))
-    .digest("hex");
-}
-
-export async function assertTrustUnchanged(pluginRecord) {
-  const { id, binary_path: binaryPath, binary_hash: storedHash } = pluginRecord;
-  if (!binaryPath) {
-    throw new PluginTrustDriftError(id, "plugin binary path is missing");
-  }
-  if (storedHash) {
-    const current = await pluginBinaryHash(binaryPath);
-    if (current !== storedHash) {
-      throw new PluginTrustDriftError(id, "plugin binary hash changed");
-    }
-  }
 }
 
 // --- commands --------------------------------------------------------------

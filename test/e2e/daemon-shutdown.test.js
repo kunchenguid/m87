@@ -85,7 +85,7 @@ describe("e2e: daemon run shuts down promptly while a slow turn is in flight", (
         plugins: {},
       }),
     );
-    await firstpass("plugin", "add", "mock", "--trust");
+    await firstpass("plugin", "add", "mock");
 
     daemon = startFirstpassDaemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));

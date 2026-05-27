@@ -7,7 +7,6 @@ import {
   loadUserPolicy,
 } from "../agent/prompts.js";
 import {
-  assertTrustUnchanged,
   detectPluginPr,
   pluginExecuteAction,
   pluginFetch,
@@ -52,7 +51,6 @@ export function createEffects(ctx) {
     if (!plugin) {
       throw new Error(`unknown plugin: ${spec.plugin_id}`);
     }
-    await assertTrustUnchanged(plugin);
     const pconfig = parseJson(plugin.config_json, {});
     const fingerprints = parseJson(plugin.fingerprints_json, {});
     const res = await pluginSync(plugin.binary_path, {
@@ -97,7 +95,6 @@ export function createEffects(ctx) {
     if (!plugin) {
       throw new Error(`unknown plugin for item ${spec.item_id}`);
     }
-    await assertTrustUnchanged(plugin);
     const pconfig = parseJson(plugin.config_json, {});
     const context = await pluginFetch(plugin.binary_path, {
       config: pconfig,
@@ -222,7 +219,6 @@ export function createEffects(ctx) {
     if (!item || !plugin) {
       throw new Error(`action effect: missing item/plugin for ${spec.item_id}`);
     }
-    await assertTrustUnchanged(plugin);
     const pconfig = parseJson(plugin.config_json, {});
     const itemRole = parseJson(item.metadata_json, {}).role;
     try {
@@ -268,7 +264,6 @@ export function createEffects(ctx) {
     if (!job || !item || !plugin) {
       throw new Error(`fix effect: missing job/item/plugin for ${spec.job_id}`);
     }
-    await assertTrustUnchanged(plugin);
     const pconfig = parseJson(plugin.config_json, {});
     const automation = parseJson(job.metadata_json, {}).automation ?? {};
     const itemRole = parseJson(item.metadata_json, {}).role;
@@ -395,7 +390,6 @@ export function createEffects(ctx) {
     if (!job || !item || !plugin) {
       throw new Error(`fix_detect effect: missing job/item/plugin`);
     }
-    await assertTrustUnchanged(plugin);
     const pconfig = parseJson(plugin.config_json, {});
     const meta = parseJson(job.metadata_json, {});
     const repository =

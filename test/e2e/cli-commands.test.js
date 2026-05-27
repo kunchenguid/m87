@@ -84,7 +84,7 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
         plugins: {},
       }),
     );
-    await firstpass("plugin", "add", "mock", "--trust");
+    await firstpass("plugin", "add", "mock");
     daemon = startFirstpassDaemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
     await firstpass("sync");

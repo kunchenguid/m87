@@ -49,7 +49,7 @@ The bundled `mock` plugin produces a deterministic item with no external side ef
 
 ```sh
 $ firstpass init                      # create ~/.firstpass and the database
-$ firstpass plugin add mock --trust   # install a side-effect-free source
+$ firstpass plugin add mock           # install a side-effect-free source
 $ firstpass daemon start              # the sole worker: syncs, triages, acts
 $ firstpass sync                      # nudge an immediate sync + triage
 $ firstpass list                      # the AI-triaged inbox, with recommendation ids
@@ -147,7 +147,6 @@ The daemon is the only worker. It owns sync, triage, action execution, and autom
 | `approve`                  | `--confirm-destructive` | Confirm destructive actions            |
 | `rerun`                    | `--instructions <text>` | Extra instructions for the agent       |
 | `plugin add` / `configure` | `--config <k=v...>`     | Set plugin configuration pairs         |
-| `plugin add`               | `--trust`               | Trust and install the plugin           |
 | `daemon run`               | `--once`                | Process the queue once and exit        |
 | `update`                   | `--check`               | Only check the registry; never install |
 
@@ -159,7 +158,7 @@ The bundled GitHub plugin syncs issues and pull requests through `gh`, and suppo
 
 ```sh
 gh auth status || gh auth login
-firstpass plugin add github --trust
+firstpass plugin add github
 firstpass plugin configure github \
   --config username=<github-login> \
   --config explicit_repos=<owner>/<repo>
@@ -168,7 +167,22 @@ firstpass plugin doctor                 # confirm the daemon resolves your gh cr
 
 `gh` must be authenticated in the same environment the daemon runs under. Configure at least one source (`explicit_repos`, `owned_repos=true`, `repo_conditions`, or `authored_external=true`), or sync completes with an empty inbox.
 
-Every item is stamped with a **role**: _maintainer_ items (repos you own or configure) expose all actions including `merge` and `review`; _contributor_ items (things you authored elsewhere, via `authored_external`) carry a `[contrib]` badge and only offer comment/close. The full GitHub plugin config table lives in [`docs/plugin-author-guide.md`](docs/plugin-author-guide.md).
+Every item is stamped with a **role**: _maintainer_ items (repos you own or configure) expose all actions including `merge` and `review`; _contributor_ items (things you authored elsewhere, via `authored_external`) carry a `[contrib]` badge and only offer comment/close.
+
+Common GitHub plugin config keys:
+
+| Key                   | Meaning                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `username`            | GitHub login to use when resolving owned repos and authored external work.                             |
+| `explicit_repos`      | Comma-separated `owner/repo` list to sync.                                                             |
+| `owned_repos`         | `true` to sync repositories owned by `username`.                                                       |
+| `repo_conditions`     | Comma-separated discovery filters: `all_owned`, `all_public_owned`, or `all_public_owned_and_starred`. |
+| `authored_external`   | `true` to sync issues and PRs authored by `username` outside configured repositories.                  |
+| `exclude_repos`       | Comma-separated `owner/repo` list to skip.                                                             |
+| `max_repos`           | Maximum repositories to sync when discovering repos.                                                   |
+| `sync_limit_per_repo` | Maximum issues or pull requests to fetch per repository.                                               |
+| `lookback_days`       | Activity lookback window in days.                                                                      |
+| `activity_probe`      | `true` to probe extra activity when selecting work.                                                    |
 
 ### Gmail
 
@@ -176,20 +190,14 @@ The bundled Gmail plugin is demo-only and fixture-backed in this release. It doe
 
 ## Configuration
 
-Config lives at `~/.firstpass/config.yaml`. The `state_dir` setting controls where the SQLite database, plugins, ACP sessions, daemon PID, and retained artifacts are stored.
+Config lives at `~/.firstpass/config.yaml` by default.
+Set `FIRSTPASS_STATE_DIR` to change where the SQLite database, plugin state, ACP sessions, daemon PID, and retained artifacts are stored.
 
 ```yaml
 agent: null # auto-detect a provider CLI (claude, then codex, then opencode); or set an acp: target
 poll_interval: 300
-state_dir: ~/.firstpass
 acp_registry_overrides: {}
-retention:
-  raw_context_ttl: 30d
-  prompt_ttl: 30d
-  draft_ttl: active
-  attachment_ttl: 7d
-  audit_ttl: keep
-sources: []
+plugins: {}
 ```
 
 If `~/.firstpass/AGENTS.md` exists, its contents are passed to every triage as a user policy, so you can steer recommendations globally. Run `firstpass status` to see the resolved agent.

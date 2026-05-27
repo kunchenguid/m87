@@ -57,8 +57,8 @@ describe("host/effects fix_detect (FU-15)", () => {
 
   async function seed(binaryPath) {
     db.prepare(
-      `insert into plugins (id, binary_path, binary_hash, version, protocol_version, manifest_json, config_json, status, installed_at)
-       values ('github', ?, null, '2', 'firstpass.plugin.v2', '{}', '{}', 'active', 't')`,
+      `insert into plugins (id, binary_path, version, protocol_version, manifest_json, config_json, status, installed_at)
+       values ('github', ?, '2', 'firstpass.plugin.v2', '{}', '{}', 'active', 't')`,
     ).run(binaryPath);
     project(
       db,
