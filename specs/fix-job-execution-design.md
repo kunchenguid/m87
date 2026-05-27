@@ -51,7 +51,7 @@ Input: `{ config, job: { id, kind, item_external_id } }`.
 Output: `{ status, workspace_path, base_ref, branch, cleanup_token, warnings }`.
 
 The plugin clones or worktrees the repo into a path it controls (mirroring ezoss's persistent investigations checkout plus an ephemeral per-job worktree), creates the fix branch, and returns the absolute `workspace_path` for the core to run the agent in.
-`status` is `prepared`, `unsupported`, or `failed`.
+`status` is `prepared` or `failed`.
 
 ### `submit-automation-workspace`
 
@@ -60,7 +60,7 @@ Output: `{ status, pr_url, commit, warnings, error }`.
 
 The plugin stages and commits any agent changes, pushes the branch, and opens a draft PR, returning the PR URL.
 It must be idempotent on `idempotency_key` (re-running a submit for the same job must not open a second PR) and must verify the branch actually has commits ahead of `base_ref` before pushing.
-`status` is `submitted`, `no_changes`, or `failed`.
+`status` is `submitted`, `no_changes`, `waiting_for_pr`, or `failed`.
 
 Both commands are `external_write`/`destructive`-class operations; the manifest declares that, and the UI treats them like any other source-visible write.
 

@@ -38,11 +38,10 @@ Required top-level fields are:
 | Field              | Meaning                                                                       |
 | ------------------ | ----------------------------------------------------------------------------- |
 | `protocol_version` | The protocol version returned by the plugin, currently `firstpass.plugin.v2`. |
-| `plugin`           | Object with `id`, `name`, and `version`.                                      |
-| `publisher`        | Object with `name` and optional `homepage_url`.                               |
+| `plugin`           | Object with `id`, `version`, optional `display_name`, and optional `publisher`. |
 | `trust`            | Distribution and provenance metadata.                                         |
 | `requested_scopes` | Array of source credential scopes and human-readable purposes.                |
-| `capabilities`     | Boolean support flags for protocol commands.                                  |
+| `capabilities`     | Array of declared capability metadata.                                        |
 | `item_types`       | Source item type ids and display names.                                       |
 | `action_types`     | Action catalog available to agent recommendations and approval flows.         |
 
@@ -51,10 +50,11 @@ Example:
 ```json
 {
   "protocol_version": "firstpass.plugin.v2",
-  "plugin": { "id": "tickets", "name": "Tickets", "version": "1.0.0" },
-  "publisher": {
-    "name": "Example Inc.",
-    "homepage_url": "https://example.com"
+  "plugin": {
+    "id": "tickets",
+    "version": "1.0.0",
+    "display_name": "Tickets",
+    "publisher": "Example Inc."
   },
   "trust": {
     "third_party": true,
@@ -71,15 +71,7 @@ Example:
       "purpose": "Create approved replies or private notes after explicit user approval."
     }
   ],
-  "capabilities": {
-    "sync": true,
-    "fetch_context": true,
-    "render_context": true,
-    "validate_action": true,
-    "preview_action": true,
-    "execute_action": true,
-    "open_url": true
-  },
+  "capabilities": ["sync", "fetch_context", "render_context", "validate_action", "preview_action", "execute_action", "open_url"],
   "item_types": [{ "type": "ticket", "display_name": "Ticket" }],
   "action_types": [
     {

@@ -94,10 +94,10 @@ If write credentials are optional, start with read-only credentials and enable w
 Retention settings control how long FirstPass keeps raw source context, rendered context, prompt context, drafts, and attachment metadata.
 Audit-preserved approval and action history is retained separately so receipts remain available after context cleanup.
 
-Review retention policy in local status:
+Run retention cleanup before destructive maintenance when needed:
 
 ```sh
-firstpass status
+firstpass retention cleanup
 ```
 
 Export a portable state snapshot before destructive maintenance or machine migration:
@@ -107,8 +107,9 @@ firstpass state export > firstpass-state.json
 firstpass state import firstpass-state.json
 ```
 
-State export includes installed plugin identities and redacts plugin config secrets and raw custom ACP command strings.
-Imported bundled plugins are reinstalled with redacted config values, so credentials must be supplied again when needed.
+State export includes installed plugin identities and redacted core configuration, including raw custom ACP command strings.
+It does not export plugin configuration or credentials.
+Imported bundled plugins are reinstalled with existing local config if present, or empty config otherwise, so credentials must be supplied again when needed.
 
 ## ACP Targets
 

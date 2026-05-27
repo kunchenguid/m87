@@ -286,11 +286,10 @@ Required manifest fields:
 | Field              | Meaning                                                                                                                                                   |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `protocol_version` | Protocol version such as `firstpass.plugin.v2`.                                                                                                           |
-| `plugin`           | `id`, `name`, and `version`.                                                                                                                              |
-| `publisher`        | Publisher `name` and optional `homepage_url`.                                                                                                             |
+| `plugin`           | `id`, `version`, optional `display_name`, and optional `publisher`.                                                                                        |
 | `trust`            | Distribution metadata such as `first_party`, `third_party`, `bundled`, explicit path, or package source.                                                  |
 | `requested_scopes` | Source credential scopes with human-readable purposes.                                                                                                    |
-| `capabilities`     | Boolean support for `sync`, `fetch_context`, `render_context`, `validate_action`, `preview_action`, `execute_action`, `open_url`, and optional `webhook`. |
+| `capabilities`     | Array of declared capability metadata.                                                                                                                    |
 | `item_types`       | Source item type IDs with display names.                                                                                                                  |
 | `action_types`     | Plugin action catalog.                                                                                                                                    |
 
@@ -589,7 +588,8 @@ Adding it usually means choosing and shipping SQLCipher or an equivalent encrypt
 The MVP should document that local data is stored in the user's filesystem under `~/.firstpass`, recommend full-disk encryption for sensitive machines, and leave database encryption as a later opt-in feature unless Gmail or enterprise use makes it a hard requirement.
 
 Backup and portability should start with local export/import, not hosted backup.
-V1 should provide an explicit export of local state, installed plugin identities, plugin configuration without secrets, retention policies, and audit history.
+V1 should provide an explicit export of local state, installed plugin identities, and redacted core configuration.
+Exporting plugin configuration, retention policies, and audit history should be treated as future portability work.
 Hosted backup can come later as an optional encrypted convenience layer and must not become required for normal local operation.
 
 Polling is the only required sync mechanism through MVP and V1.
@@ -715,7 +715,7 @@ Phase 4: Trust, privacy, and retention
 - [x] Add raw ACP command redaction across logs, errors, status output, and e2e assertions.
 - [x] Persist plugin manifest metadata for publisher, version, requested scopes, capabilities, and action catalog metadata.
 - [x] Add user-facing plugin author documentation for manifests, protocol commands, trust metadata, scopes, and safety levels.
-- [x] Add export/import for local state, plugin manifests, plugin config without secrets, retention policies, and audit history.
+- [x] Add export/import for installed plugin identities and redacted core configuration.
 
 Phase 5: Gmail and broader source proof after MVP
 
