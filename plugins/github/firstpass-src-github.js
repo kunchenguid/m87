@@ -1319,19 +1319,6 @@ const MANIFEST = {
     display_name: "GitHub",
     publisher: "firstpass",
   },
-  trust: { first_party: true, bundled: true, network: ["github.com"] },
-  requested_scopes: [
-    {
-      scope: "repo:read",
-      purpose:
-        "Read issues, pull requests, comments, labels, and state changes that may need attention.",
-    },
-    {
-      scope: "repo:write",
-      purpose:
-        "Post approved comments, reviews, labels, and state transitions only after explicit user approval.",
-    },
-  ],
   capabilities: ["sync", "fetch", "actions", "automation"],
   item_types: [
     { type: "issue", display_name: "Issue" },

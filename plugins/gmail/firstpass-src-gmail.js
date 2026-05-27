@@ -55,24 +55,6 @@ const MANIFEST = {
     display_name: "Gmail",
     publisher: "firstpass",
   },
-  trust: {
-    first_party: true,
-    bundled: true,
-    network: ["none"],
-    writes: ["gmail"],
-  },
-  requested_scopes: [
-    {
-      scope: "gmail.modify",
-      purpose:
-        "Read and modify selected Gmail threads for review-queue triage without storing OAuth secrets in FirstPass config.",
-    },
-    {
-      scope: "gmail.compose",
-      purpose:
-        "Create draft replies only after explicit user approval; sending mail is intentionally out of scope.",
-    },
-  ],
   capabilities: ["sync", "fetch", "actions"],
   item_types: [{ type: "email_thread", display_name: "Email Thread" }],
   action_types: [

@@ -272,8 +272,8 @@ The approval boundary protects users from agent-selected actions executed by hon
 
 MVP must document that tradeoff instead of pretending it is solved by the protocol.
 This is not sandbox enforcement.
-Plugin records persist the binary path, resolved version, and full manifest metadata, including publisher, requested source scopes, declared capabilities, and action safety levels.
-First-party plugins can be marked as bundled or verified, but their manifests still include source scopes and write-capable actions.
+Plugin records persist the binary path, resolved version, and full manifest metadata, including publisher, declared capabilities, and action safety levels.
+First-party plugins can be marked as bundled or verified, but their manifests still include write-capable actions.
 
 The product should educate users to prefer the narrowest practical source credentials, inspect OAuth scopes before authorizing a plugin, avoid untrusted third-party plugins for sensitive accounts, and disable write scopes if they only want read-only recommendations.
 Requiring separate read and write credentials is not an MVP requirement because that adds too much setup friction.
@@ -281,7 +281,7 @@ Later versions can add sandboxing, signed plugins, permission prompts, and stron
 
 ### Manifest
 
-The manifest declares source identity, protocol version, configuration schema, trust metadata, requested source scopes, item types, action types, and capabilities.
+The manifest declares source identity, protocol version, configuration schema, item types, action types, and capabilities.
 Protocol-required manifest fields:
 
 | Field              | Meaning                                                             |
@@ -291,13 +291,11 @@ Protocol-required manifest fields:
 
 Recommended manifest metadata fields:
 
-| Field              | Meaning                                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------------------------- |
-| `trust`            | Distribution metadata such as `first_party`, `third_party`, `bundled`, explicit path, or package source. |
-| `requested_scopes` | Source credential scopes with human-readable purposes.                                                   |
-| `capabilities`     | Array of declared capability metadata.                                                                   |
-| `item_types`       | Source item type IDs with display names.                                                                 |
-| `action_types`     | Plugin action catalog.                                                                                   |
+| Field          | Meaning                                  |
+| -------------- | ---------------------------------------- |
+| `capabilities` | Array of declared capability metadata.   |
+| `item_types`   | Source item type IDs with display names. |
+| `action_types` | Plugin action catalog.                   |
 
 Each action type declares `type`, `display_name`, `description`, `safety`, `idempotency`, strict JSON `schema`, and prompt examples.
 `safety` must be one of `local_only`, `source_private`, `external_write`, or `destructive`.
@@ -553,7 +551,7 @@ Third-party discovery from explicit config paths, `~/.firstpass/plugins`, or `PA
 
 The plugin command should be stable enough for third-party plugins in any language.
 Bundling does not imply provenance or safety.
-The core should store plugin source, scope, capability, and action metadata for installed plugins.
+The core should store plugin source, capability, and action metadata for installed plugins.
 
 ## Security, Privacy, And Observability
 
@@ -563,7 +561,7 @@ Requirements:
 - Gate remote writes on approval.
 - Show exact outgoing text before approval.
 - Store action audit records.
-- Store plugin source, scope, and capability information from installed plugin manifests.
+- Store plugin source and capability information from installed plugin manifests.
 - Avoid logging secrets.
 - Redact plugin stderr in user-facing bug reports unless the user opts in.
 - Clean up expired prompt contexts and keep broader retention controls future-compatible.
@@ -703,7 +701,7 @@ Phase 2: Approval and review UX
 Phase 3: First-party GitHub plugin
 
 - [x] Implement GitHub plugin configuration using existing credentials or OS credential storage without writing secrets to core config.
-- [x] Implement GitHub manifest, trust metadata, item types, action types, action schemas, safety levels, and prompt examples.
+- [x] Implement GitHub manifest, item types, action types, action schemas, safety levels, and prompt examples.
 - [x] Implement GitHub sync for issues, pull requests, review threads, comments, reviews, labels, state changes, fingerprints, and rate limits.
 - [x] Implement GitHub fetch context with compact human context, compact agent context, evidence references, source URLs, and code-related metadata.
 - [x] Implement GitHub action validation and previews for comments, labels, close, reopen, review actions, and safe PR actions.
@@ -717,8 +715,8 @@ Phase 4: Trust, privacy, and retention
 - [ ] Implement retention cleanup for raw context, rendered context, drafts, attachments, and audit policy controls.
 - [x] Add ACP target disclosure and hosted-model warning copy.
 - [x] Add raw ACP command redaction helper for logs and user-facing errors; status and export hardening remains future work.
-- [x] Persist plugin manifest metadata for publisher, version, requested scopes, capabilities, and action catalog metadata.
-- [x] Add user-facing plugin author documentation for manifests, protocol commands, trust metadata, scopes, and safety levels.
+- [x] Persist plugin manifest metadata for publisher, version, capabilities, and action catalog metadata.
+- [x] Add user-facing plugin author documentation for manifests, protocol commands, credential risks, scopes, and safety levels.
 - [x] Add export/import for installed plugin identities and redacted core configuration.
 
 Phase 5: Gmail and broader source proof after MVP

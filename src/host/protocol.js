@@ -17,11 +17,9 @@ export const manifestSchema = z
       display_name: z.string().optional(),
       publisher: z.string().optional(),
     }),
-    requested_scopes: z.array(z.any()).optional(),
     item_types: z.array(z.any()).optional(),
     action_types: z.array(z.any()).optional(),
     capabilities: z.array(z.any()).optional(),
-    trust: z.any().optional(),
   })
   .passthrough();
 

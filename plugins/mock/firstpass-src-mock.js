@@ -32,7 +32,6 @@ const MANIFEST = {
     display_name: "Mock Source",
     publisher: "firstpass",
   },
-  requested_scopes: [{ name: "mock.read", description: "Read mock items" }],
   item_types: [{ type: "issue", display_name: "Mock Issue" }],
   action_types: [
     {
@@ -43,7 +42,6 @@ const MANIFEST = {
     },
   ],
   capabilities: ["sync", "fetch", "actions", "automation"],
-  trust: { network: ["none"], writes: ["mock"] },
 };
 
 // The "live source" the mock reflects. Config can override `items`.
