@@ -2,7 +2,7 @@ import { renderToString } from "ink";
 import React from "react";
 import { describe, expect, it } from "vitest";
 
-import { InboxView } from "../../src/tui/components.js";
+import { InboxView, InfoView } from "../../src/tui/components.js";
 
 const h = React.createElement;
 
@@ -78,7 +78,7 @@ describe("tui/InboxView", () => {
     expect(out).toContain("acp:claude");
   });
 
-  it("shows badges, an urgent marker, and a daemon-offline warning", () => {
+  it("shows badges, an urgent marker, the offline header state, and the notice", () => {
     const out = render({
       count: 1,
       selectedIndex: 0,
@@ -117,8 +117,79 @@ describe("tui/InboxView", () => {
     expect(out).toContain("contrib");
     expect(out).toContain("stale");
     expect(out).toContain("My upstream PR");
-    // offline daemon must be surfaced somewhere
-    expect(out.toLowerCase()).toContain("daemon");
+    // offline daemon is signalled by the header state, not a footer warning
+    expect(out.toLowerCase()).toContain("offline");
     expect(out).toContain("approve queued");
+  });
+
+  it("keeps queue counts and the verbose offline warning off the main screen", () => {
+    const out = render({
+      count: 0,
+      selectedIndex: 0,
+      items: [],
+      detail: null,
+      status: { ...baseStatus, deadLetter: 2 },
+      daemonRunning: false,
+      notice: "",
+    });
+    // counts and the remediation command live on the info screen now
+    expect(out).not.toContain("dead-letter");
+    expect(out).not.toContain("daemon start");
+    // but the offline state and the way to see more stay discoverable
+    expect(out.toLowerCase()).toContain("offline");
+    expect(out.toLowerCase()).toContain("info");
+  });
+});
+
+describe("tui/InfoView", () => {
+  const infoModel = (overrides = {}) => ({
+    count: 3,
+    selectedIndex: 0,
+    items: [],
+    detail: null,
+    notice: "",
+    daemonRunning: true,
+    status: {
+      agentTarget: "acp:claude",
+      events: 12,
+      pending: 1,
+      deadLetter: 0,
+    },
+    ...overrides,
+  });
+
+  it("shows queue counts, the agent target, and a live daemon status", () => {
+    const out = renderToString(
+      h(InfoView, { model: infoModel(), width: 100, height: 30 }),
+    );
+    expect(out).toContain("acp:claude");
+    expect(out).toContain("events");
+    expect(out).toContain("pending");
+    expect(out).toContain("dead-letter");
+    expect(out).toContain("12");
+    expect(out.toLowerCase()).toContain("live");
+    // a way back is always offered
+    expect(out.toLowerCase()).toContain("back");
+  });
+
+  it("surfaces the offline remediation command when the daemon is down", () => {
+    const out = renderToString(
+      h(InfoView, {
+        model: infoModel({
+          daemonRunning: false,
+          status: {
+            agentTarget: "acp:claude",
+            events: 0,
+            pending: 0,
+            deadLetter: 3,
+          },
+        }),
+        width: 100,
+        height: 30,
+      }),
+    );
+    expect(out.toLowerCase()).toContain("offline");
+    expect(out).toContain("firstpass daemon start");
+    expect(out).toContain("3");
   });
 });

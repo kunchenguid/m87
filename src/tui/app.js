@@ -4,7 +4,7 @@ import React from "react";
 import { makeEvent } from "../core/event.js";
 import { enqueue } from "../core/queue.js";
 import { listInbox, logCursor } from "../core/views.js";
-import { InboxView } from "./components.js";
+import { InboxView, InfoView } from "./components.js";
 import { buildInboxModel } from "./render.js";
 
 const { createElement: h, useEffect, useState } = React;
@@ -20,6 +20,7 @@ function InboxApp({ db, agentTarget, daemonPid }) {
   const [selected, setSelected] = useState(0);
   const [cursor, setCursor] = useState(logCursor(db));
   const [notice, setNotice] = useState("");
+  const [view, setView] = useState("inbox");
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -49,6 +50,19 @@ function InboxApp({ db, agentTarget, daemonPid }) {
   useInput((input, key) => {
     if (input === "q") {
       exit();
+      return;
+    }
+    // The info screen is a modal overlay: `i` toggles it, esc backs out, and
+    // every other key is swallowed so inbox navigation/actions don't fire while
+    // it's up.
+    if (view === "info") {
+      if (input === "i" || key.escape) {
+        setView("inbox");
+      }
+      return;
+    }
+    if (input === "i") {
+      setView("info");
       return;
     }
     if (key.downArrow || input === "j") {
@@ -132,11 +146,8 @@ function InboxApp({ db, agentTarget, daemonPid }) {
     notice,
   });
   // Reserve the bottom row so the final line never scrolls the alt-screen.
-  return h(InboxView, {
-    model,
-    width: columns,
-    height: Math.max(10, rows - 1),
-  });
+  const dims = { model, width: columns, height: Math.max(10, rows - 1) };
+  return h(view === "info" ? InfoView : InboxView, dims);
 }
 
 const ENTER_ALT_SCREEN = "\x1b[?1049h\x1b[2J\x1b[H";

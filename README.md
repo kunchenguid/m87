@@ -76,6 +76,7 @@ $ firstpass approve <recommendation-id> --confirm
 ```
 
 Run `firstpass` with no arguments in a terminal to open the live interactive inbox instead.
+Press `i` for queue details, startup help, and other inbox info; press `i` or Esc to return.
 
 ## Install
 

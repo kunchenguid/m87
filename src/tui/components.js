@@ -6,8 +6,12 @@ import { confidenceColor, theme } from "./theme.js";
 const h = React.createElement;
 
 // A filled chip: dark text on a colored background, e.g. badges and the brand.
-function Chip({ label, color, fg = theme.bg, bold = true }) {
-  return h(Text, { backgroundColor: color, color: fg, bold }, ` ${label} `);
+// Never bold: terminals render a bold base ANSI color as its *bright* variant,
+// and bright-black reads as gray - so bold + our black `fg` would defeat the
+// whole "dark text on a bright chip" look. The background already carries the
+// emphasis, so the dark text stays crisp and readable without it.
+function Chip({ label, color, fg = theme.bg }) {
+  return h(Text, { backgroundColor: color, color: fg }, ` ${label} `);
 }
 
 // One key hint: a bright key glyph followed by a muted label.
@@ -75,11 +79,9 @@ function ItemRow({ row, width }) {
       Text,
       { key: b },
       " ",
-      h(
-        Text,
-        { color: theme.bg, backgroundColor: badgeColor(b), bold: true },
-        ` ${b} `,
-      ),
+      // Not bold: bold + black fg renders as bright-black (gray) on most
+      // terminals, which would wash the badge out. See Chip.
+      h(Text, { color: theme.bg, backgroundColor: badgeColor(b) }, ` ${b} `),
     ),
   );
   // Budget the title by hand: the row is a fixed grid of bar + urgent + title +
@@ -134,7 +136,7 @@ function InboxPane({ model, width, height }) {
           h(
             Text,
             { key: "empty", color: theme.muted, italic: true },
-            "  nothing waiting on you",
+            "nothing waiting on you",
           ),
         ]
       : visible.map((row) =>
@@ -182,12 +184,12 @@ function OptionCard({ opt, width }) {
     Box,
     { flexDirection: "row", height: 1 },
     h(Text, { color: theme.dim }, "  ○ "),
+    // Not bold: bold + black fg renders as bright-black (gray). See Chip.
     h(
       Text,
       {
         color: theme.bg,
         backgroundColor: confidenceColor(opt.confidence),
-        bold: true,
       },
       ` ${label} `,
     ),
@@ -243,8 +245,10 @@ function DetailPane({ model, width, height }) {
   );
 }
 
+// The main-screen footer is just the keybar plus any transient action notice.
+// Queue counts and the daemon-offline remediation moved to the info screen (i)
+// so the working surface stays uncluttered; the header still shows live/offline.
 function Footer({ model, width }) {
-  const offline = !model.daemonRunning;
   return h(
     Box,
     { width, flexDirection: "column" },
@@ -262,36 +266,10 @@ function Footer({ model, width }) {
       h(Key, { keyLabel: "d", label: "dismiss", color: theme.red }),
       h(Key, { keyLabel: "s", label: "snooze", color: theme.yellow }),
       h(Key, { keyLabel: "r", label: "refresh", color: theme.accentAlt }),
+      h(Key, { keyLabel: "i", label: "info", color: theme.accent }),
       h(Box, { flexGrow: 1 }),
       h(Key, { keyLabel: "q", label: "quit", color: theme.muted }),
     ),
-    h(
-      Box,
-      { flexDirection: "row", paddingX: 1 },
-      h(Text, { color: theme.dim }, "events "),
-      h(Text, { color: theme.fg }, `${model.status.events}`),
-      h(Text, { color: theme.dim }, "  ·  pending "),
-      h(Text, { color: theme.fg }, `${model.status.pending}`),
-      h(Text, { color: theme.dim }, "  ·  dead-letter "),
-      h(
-        Text,
-        { color: model.status.deadLetter > 0 ? theme.red : theme.fg },
-        `${model.status.deadLetter}`,
-      ),
-    ),
-    // Warning and notice each get their own line so they never crowd the counts
-    // into truncation on narrow terminals.
-    offline
-      ? h(
-          Box,
-          { paddingX: 1 },
-          h(
-            Text,
-            { color: theme.red },
-            "⚠ daemon offline - start with `firstpass daemon start`",
-          ),
-        )
-      : null,
     model.notice
       ? h(
           Box,
@@ -308,12 +286,10 @@ function Footer({ model, width }) {
 export function InboxView({ model, width = 100, height = 30 }) {
   const leftWidth = Math.max(28, Math.floor(width * 0.42));
   const rightWidth = width - leftWidth - 1;
-  // Header is 3 rows; footer is the keybar box (3) + counts (1) plus an extra
-  // row each for the offline warning and any notice. Give the body the rest so
-  // nothing scrolls the alt-screen.
+  // Header is 3 rows; footer is the keybar box (3) plus one row for any notice.
+  // Give the body the rest so nothing scrolls the alt-screen.
   const headerHeight = 3;
-  const footerHeight =
-    4 + (model.daemonRunning ? 0 : 1) + (model.notice ? 1 : 0);
+  const footerHeight = 3 + (model.notice ? 1 : 0);
   const bodyHeight = Math.max(6, height - headerHeight - footerHeight);
   return h(
     Box,
@@ -326,5 +302,96 @@ export function InboxView({ model, width = 100, height = 30 }) {
       h(DetailPane, { model, width: rightWidth, height: bodyHeight }),
     ),
     h(Footer, { model, width }),
+  );
+}
+
+// One labelled row in the info screen: a muted left label and a value column
+// that starts in a fixed column so the values line up as a little table.
+function InfoRow({ label, children = null }) {
+  return h(
+    Box,
+    { flexDirection: "row" },
+    h(Text, { color: theme.muted }, `  ${label.padEnd(14)}`),
+    children,
+  );
+}
+
+// The info screen, reached with `i` and dismissed with `i`/esc. It carries the
+// chrome that used to crowd the inbox footer - daemon health (with the start
+// command when offline), the agent target, and the queue counts - so the inbox
+// itself stays focused on what's waiting on you.
+export function InfoView({ model, width = 100, height = 30 }) {
+  const { status, daemonRunning, count } = model;
+  const daemon = daemonRunning
+    ? h(Text, { color: theme.green }, "● live")
+    : h(Text, { color: theme.red, bold: true }, "○ offline");
+  const deadLetterColor = status.deadLetter > 0 ? theme.red : theme.fg;
+  return h(
+    Box,
+    {
+      width,
+      height,
+      borderStyle: "round",
+      borderColor: theme.accent,
+      paddingX: 2,
+      paddingY: 1,
+      flexDirection: "column",
+    },
+    h(
+      Box,
+      { marginBottom: 1, flexDirection: "row", alignItems: "center" },
+      h(Chip, { label: "firstpass", color: theme.accent }),
+      h(Text, { color: theme.muted }, "  info"),
+    ),
+
+    h(InfoRow, { label: "daemon" }, daemon),
+    daemonRunning
+      ? null
+      : h(
+          InfoRow,
+          { label: "" },
+          h(Text, { color: theme.dim }, "start with `firstpass daemon start`"),
+        ),
+    h(
+      InfoRow,
+      { label: "agent" },
+      h(Text, { color: theme.accentAlt }, `◆ ${status.agentTarget}`),
+    ),
+    h(
+      InfoRow,
+      { label: "inbox" },
+      h(Text, { color: theme.fg }, `${count} `),
+      h(Text, { color: theme.muted }, count === 1 ? "item" : "items"),
+    ),
+
+    h(
+      Box,
+      { marginTop: 1 },
+      h(Text, { color: theme.accent, bold: true }, "QUEUE"),
+    ),
+    h(
+      InfoRow,
+      { label: "events" },
+      h(Text, { color: theme.fg }, `${status.events}`),
+    ),
+    h(
+      InfoRow,
+      { label: "pending" },
+      h(Text, { color: theme.fg }, `${status.pending}`),
+    ),
+    h(
+      InfoRow,
+      { label: "dead-letter" },
+      h(Text, { color: deadLetterColor }, `${status.deadLetter}`),
+    ),
+
+    h(Box, { flexGrow: 1 }),
+    h(
+      Box,
+      { flexDirection: "row", columnGap: 2 },
+      h(Key, { keyLabel: "i", label: "back", color: theme.accent }),
+      h(Key, { keyLabel: "esc", label: "back", color: theme.muted }),
+      h(Key, { keyLabel: "q", label: "quit", color: theme.muted }),
+    ),
   );
 }
