@@ -43,6 +43,22 @@ function InboxApp({ db, agentTarget, daemonPid }) {
 
   const inbox = listInbox(db);
   const current = inbox[Math.min(selected, Math.max(0, inbox.length - 1))];
+  const currentRecommendationId = current?.recommendation_id ?? null;
+  const previousRecommendationId = useRef(currentRecommendationId);
+  const selectedOptionRecommendationId = useRef(currentRecommendationId);
+  const effectiveSelectedOption =
+    selectedOptionRecommendationId.current === currentRecommendationId
+      ? selectedOption
+      : 0;
+
+  useEffect(() => {
+    if (previousRecommendationId.current === currentRecommendationId) {
+      return;
+    }
+    previousRecommendationId.current = currentRecommendationId;
+    setSelectedOption(0);
+    setDetailScroll(0);
+  }, [currentRecommendationId]);
 
   // Enqueue a decision event for the daemon. Requires a live daemon; otherwise
   // the event would sit unprocessed, so we refuse and tell the user.
@@ -78,12 +94,14 @@ function InboxApp({ db, agentTarget, daemonPid }) {
     // the recommendation changes). j/k are reserved for scrolling the detail.
     if (key.downArrow) {
       setSelected((s) => Math.min(s + 1, inbox.length - 1));
+      selectedOptionRecommendationId.current = null;
       setSelectedOption(0);
       setDetailScroll(0);
       return;
     }
     if (key.upArrow) {
       setSelected((s) => Math.max(s - 1, 0));
+      selectedOptionRecommendationId.current = null;
       setSelectedOption(0);
       setDetailScroll(0);
       return;
@@ -115,6 +133,7 @@ function InboxApp({ db, agentTarget, daemonPid }) {
         )
         .get(current.recommendation_id).c;
       if (count > 0) {
+        selectedOptionRecommendationId.current = currentRecommendationId;
         setSelectedOption(Math.min(Number(input) - 1, count - 1));
         setDetailScroll(0);
       }
@@ -126,7 +145,8 @@ function InboxApp({ db, agentTarget, daemonPid }) {
           "select id from recommendation_options where recommendation_id=? order by position",
         )
         .all(current.recommendation_id);
-      const option = options[Math.min(selectedOption, options.length - 1)];
+      const option =
+        options[Math.min(effectiveSelectedOption, options.length - 1)];
       if (option) {
         act(
           makeEvent({
@@ -182,7 +202,7 @@ function InboxApp({ db, agentTarget, daemonPid }) {
 
   const model = buildInboxModel(db, {
     selectedIndex: selected,
-    selectedOption,
+    selectedOption: effectiveSelectedOption,
     detailScroll,
     agentTarget,
     daemonRunning: Boolean(daemonPid()),
