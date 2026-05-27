@@ -712,8 +712,8 @@ Phase 3: First-party GitHub plugin
 
 Phase 4: Trust, privacy, and retention
 
-- [x] Implement retention policies for raw context, rendered context, prompts, drafts, attachments, and audit-preserved records.
-- [x] Implement retention cleanup jobs and e2e coverage for expiration without deleting required audit history.
+- [x] Seed retention policy defaults and implement prompt-context TTL cleanup.
+- [ ] Implement retention cleanup for raw context, rendered context, drafts, attachments, and audit policy controls.
 - [x] Add ACP target disclosure and hosted-model warning copy.
 - [x] Add raw ACP command redaction helper for logs and user-facing errors; status and export hardening remains future work.
 - [x] Persist plugin manifest metadata for publisher, version, requested scopes, capabilities, and action catalog metadata.

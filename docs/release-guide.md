@@ -92,8 +92,8 @@ If write credentials are optional, start with read-only credentials and enable w
 
 ## Retention
 
-Retention settings control how long FirstPass keeps raw source context, rendered context, prompt context, drafts, and attachment metadata.
-Audit-preserved approval and action history is retained separately so receipts remain available after context cleanup.
+Retention cleanup currently expires prompt context rows that have passed their TTL.
+Broader cleanup for raw source context, rendered context, drafts, attachments, and audit policy controls remains future work.
 
 Run retention cleanup before destructive maintenance when needed:
 

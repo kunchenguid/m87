@@ -43,7 +43,8 @@ This uses plugin protocol commands implemented by the daemon effect runner.
 
 ## Plugin Protocol Commands
 
-These follow the existing JSON-stdin/JSON-stdout convention and are declared in the manifest `capabilities` block so the core only offers fix jobs for plugins that support them.
+These follow the existing JSON-stdin/JSON-stdout convention.
+The current core queues fix jobs from recommendation options that include `automation`; manifest capability gating remains future work.
 
 ### `prepare-automation-workspace`
 
@@ -132,7 +133,7 @@ Offline by default, mirroring the existing e2e style.
 
 - Mock plugin gains `prepare-automation-workspace` / `submit-automation-workspace` returning a temp dir and a fake PR URL.
 - e2e: approve an option with `automation`, run `daemon start --once`, assert the job transitions `queued -> pr_opened` and `metadata_json.pr_url` is set.
-- e2e failure paths: prepare failure, agent no-op (`no_changes`), submit failure (`failed` + error), stale reclaim, idempotent re-submit.
+- e2e failure paths: prepare failure, agent no-op (`no_changes`), submit failure (`failed` + error), idempotent re-submit.
 - A GitHub-plugin contract test for the two new commands against recorded fixtures (no live network).
 - ACP `cwd` is exercised by pointing the mock ACP target at the prepared workspace and asserting it ran there.
 
