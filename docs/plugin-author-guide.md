@@ -27,7 +27,7 @@ Supported commands are:
 | `execute-action`  | Execute one approved action with an approval id and idempotency key.                                    |
 | `prepare-automation-workspace` | Prepare a source-owned workspace for an approved automation job.                           |
 | `submit-automation-workspace`  | Submit workspace changes for an approved automation job.                                |
-| `detect-pr`       | Re-detect a pull request for a submitted automation job when initial detection was delayed.              |
+| `detect-automation-pr` | Re-detect a pull request for a submitted automation job when initial detection was delayed.        |
 
 ## Manifest
 

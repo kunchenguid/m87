@@ -62,7 +62,7 @@ The plugin stages and commits any agent changes, pushes the branch, and opens a 
 It must be idempotent on `idempotency_key` (re-running a submit for the same job must not open a second PR) and must verify the branch actually has commits ahead of `base_ref` before pushing.
 `status` is `submitted`, `no_changes`, `waiting_for_pr`, or `failed`.
 
-### `detect-pr`
+### `detect-automation-pr`
 
 Input: `{ config, repository, branch }`.
 Output: `{ status, pr_url, warnings, error }`.
@@ -100,7 +100,7 @@ Per cycle:
 3. Run the ACP coding agent in `workspace_path` with the job prompt -> `running_agent`.
 4. `submit-automation-workspace` -> `submitting` -> `pr_opened`, `no_changes`, or `waiting_for_pr`.
 5. Persist phase, `pr_url`, and metadata at each transition through job events.
-6. Use `firstpass job attach` / `detect-pr` to close a `waiting_for_pr` job after delayed PR creation.
+6. Use `firstpass job attach` / `detect-automation-pr` to close a `waiting_for_pr` job after delayed PR creation.
 
 Queue-backed execution keeps remote writes paced and observable while preserving the same event-driven projection model as triage and actions.
 

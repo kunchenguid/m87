@@ -257,7 +257,7 @@ firstpass-src-github preview-action
 firstpass-src-github execute-action
 firstpass-src-github prepare-automation-workspace
 firstpass-src-github submit-automation-workspace
-firstpass-src-github detect-pr
+firstpass-src-github detect-automation-pr
 ```
 
 Plugin executable names must follow the `firstpass-src-xyz` convention.
