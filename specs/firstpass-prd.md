@@ -560,7 +560,7 @@ Requirements:
 - Gate remote writes on approval.
 - Show exact outgoing text before approval.
 - Store action audit records.
-- Show plugin trust information before enabling a plugin.
+- Show plugin source, scope, and capability information before plugin installation and configuration.
 - Avoid logging secrets.
 - Redact plugin stderr in user-facing bug reports unless the user opts in.
 - Let users configure retention for raw source context.

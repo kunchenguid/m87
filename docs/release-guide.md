@@ -85,11 +85,11 @@ firstpass plugin add <plugin-id>
 Core FirstPass config should not contain source secrets.
 Prefer source-owned credential stores such as a source CLI, OAuth token store, OS keychain, or plugin-owned encrypted credential file.
 
-When adding a source account, follow the plugin disclosure and credential guidance:
+When configuring a source plugin, follow the plugin disclosure and credential guidance:
 
 ```sh
-firstpass source add <plugin-id>
-firstpass source add <plugin-id> --account <account-name>
+firstpass plugin add <plugin-id>
+firstpass plugin configure <plugin-id> --config <key>=<value>
 ```
 
 Use the narrowest credential scope that supports the workflow you need.
@@ -166,7 +166,7 @@ firstpass view <item-id>
 firstpass triage <item-id>
 firstpass view <item-id>
 firstpass preview <recommendation-id> --option <option-id>
-firstpass approve <recommendation-id> --option <option-id> --confirm-previewed
+firstpass approve <recommendation-id> --option <option-id> --confirm
 firstpass audit receipt <approval-id>
 ```
 
