@@ -167,7 +167,22 @@ firstpass plugin doctor                 # confirm the daemon resolves your gh cr
 
 `gh` must be authenticated in the same environment the daemon runs under. Configure at least one source (`explicit_repos`, `owned_repos=true`, `repo_conditions`, or `authored_external=true`), or sync completes with an empty inbox.
 
-Every item is stamped with a **role**: _maintainer_ items (repos you own or configure) expose all actions including `merge` and `review`; _contributor_ items (things you authored elsewhere, via `authored_external`) carry a `[contrib]` badge and only offer comment/close. The full GitHub plugin config table lives in [`docs/plugin-author-guide.md`](docs/plugin-author-guide.md).
+Every item is stamped with a **role**: _maintainer_ items (repos you own or configure) expose all actions including `merge` and `review`; _contributor_ items (things you authored elsewhere, via `authored_external`) carry a `[contrib]` badge and only offer comment/close.
+
+Common GitHub plugin config keys:
+
+| Key | Meaning |
+| --- | ------- |
+| `username` | GitHub login to use when resolving owned repos and authored external work. |
+| `explicit_repos` | Comma-separated `owner/repo` list to sync. |
+| `owned_repos` | `true` to sync repositories owned by `username`. |
+| `repo_conditions` | Comma-separated discovery filters: `all_owned`, `all_public_owned`, or `all_public_owned_and_starred`. |
+| `authored_external` | `true` to sync issues and PRs authored by `username` outside configured repositories. |
+| `exclude_repos` | Comma-separated `owner/repo` list to skip. |
+| `max_repos` | Maximum repositories to sync when discovering repos. |
+| `sync_limit_per_repo` | Maximum issues or pull requests to fetch per repository. |
+| `lookback_days` | Activity lookback window in days. |
+| `activity_probe` | `true` to probe extra activity when selecting work. |
 
 ### Gmail
 

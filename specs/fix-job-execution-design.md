@@ -49,7 +49,7 @@ The current core queues fix jobs from recommendation options that include `autom
 ### `prepare-automation-workspace`
 
 Input: `{ config, job: { id, kind, item_external_id } }`.
-Output: `{ status, workspace_path, base_ref, branch, cleanup_token, warnings }`.
+Output: `{ status, workspace_path, base_ref, branch, warnings }`.
 
 The plugin clones or worktrees the repo into a path it controls (mirroring ezoss's persistent investigations checkout plus an ephemeral per-job worktree), creates the fix branch, and returns the absolute `workspace_path` for the core to run the agent in.
 `status` is `prepared` or `failed`.
