@@ -136,7 +136,9 @@ describe("e2e: init wizard command contract", () => {
 
     const db = new Database(join(stateDir, "firstpass.sqlite"));
     try {
-      const plugin = db.prepare("select * from plugins where id='github'").get();
+      const plugin = db
+        .prepare("select * from plugins where id='github'")
+        .get();
       expect(JSON.parse(plugin.config_json)).toMatchObject({
         explicit_repos: ["kunchenguid/firstpass"],
       });
