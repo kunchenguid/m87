@@ -38,7 +38,8 @@ firstpass init
 firstpass status
 ```
 
-By default, FirstPass reads configuration from `~/.firstpass/config.yaml` and stores local state under the configured state directory.
+By default, FirstPass reads configuration and stores local state under `~/.firstpass`.
+Set `FIRSTPASS_STATE_DIR` to use a different state directory.
 The status command reports configured state, agent target and source, installed plugin sync health, local item counts, queue counts, and audit event count.
 
 Example minimal config:
@@ -46,19 +47,12 @@ Example minimal config:
 ```yaml
 agent: null
 poll_interval: 300
-state_dir: ~/.firstpass
 acp_registry_overrides: {}
-retention:
-  raw_context_ttl: 30d
-  prompt_ttl: 30d
-  draft_ttl: active
-  attachment_ttl: 7d
-  audit_ttl: keep
-sources: []
+plugins: {}
 ```
 
-`state_dir` controls the SQLite database, plugin install directory, ACP session directory, daemon PID file, and retained local artifacts.
-The config file itself remains at `~/.firstpass/config.yaml` so FirstPass can find the configured state directory.
+The state directory contains the SQLite database, plugin state, ACP session directory, daemon PID file, and retained local artifacts.
+Installed plugin configuration is stored with the plugin record.
 
 ## Plugin Trust
 
@@ -122,14 +116,7 @@ FirstPass can route recommendation generation to an ACP-compatible target when c
 Hosted model targets should be treated as data-sharing boundaries because prompt context can include source-derived content.
 
 Use `firstpass status` to verify the currently configured ACP target before running triage.
-For sensitive sources, disable agent processing in config so items can sync without prompt-context generation:
-
-```yaml
-sources:
-  - id: github-work
-    agent_processing: false
-    policy: Prefer short maintainer replies and never recommend closing user bug reports without evidence.
-```
+For sensitive sources, use a local ACP target or avoid running triage for plugins whose source content should not enter prompts.
 
 Custom ACP command specs are redacted in status, item detail, and state export output.
 Accepted ACP target config values are either `agent: null`, a named registry target such as `agent: acp:mock-agent`, or a raw ACP server command string after `acp:`.

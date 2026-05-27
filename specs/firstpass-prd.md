@@ -12,7 +12,7 @@ Each surface has its own notification model, unread state, labels, permissions, 
 
 The product runs locally by default, keeps private reasoning and drafts on the user's machine, and treats every source as a plugin.
 The core does not understand GitHub, Gmail, X, or any other source in detail.
-Plugins translate native systems into a shared set of primitives: accounts, items, events, context, capabilities, and executable actions.
+Plugins translate native systems into a shared set of primitives: configured scopes, items, events, context, capabilities, and executable actions.
 
 ## Problem
 
@@ -125,7 +125,7 @@ A configured plugin is the unit of scope; there is no separate source-account ob
 ### Inbox And Detail
 
 The default UI is a review queue.
-Each row shows source, account, item type, sender or actor, title or subject, recommendation state, waiting state, and freshness.
+Each row shows source, item type, sender or actor, title or subject, recommendation state, waiting state, and freshness.
 After more plugins exist, the queue can contain rows like:
 
 ```text
@@ -469,7 +469,7 @@ Responsibilities are deliberately narrow:
 - Plugin decides source semantics: what changed, whether the source thinks the user probably needs to look, `attention.reason`, `waiting_on`, and optional `priority_hint`.
 - Core applies source-neutral local state: enabled plugin, include and ignore rules, snooze, dismissed, handled, newer activity watermark, and recommendation validity.
 - Agent explains and recommends actions for queued items; it does not decide whether an item should silently disappear from the queue.
-- User fixes noise with explicit ignore rules, source config, plugin config, dismiss, snooze, or mark handled.
+- User fixes noise with explicit ignore rules, plugin config, dismiss, snooze, or mark handled.
 
 Default sorting is deterministic:
 
@@ -538,7 +538,8 @@ Global config lives at `~/.firstpass/config.yaml`.
 Plugin credentials should not be stored in core config unless unavoidable.
 Plugins should prefer OS keychain, existing CLIs, OAuth token stores, or their own encrypted files.
 
-The config contains `agent`, `poll_interval`, `state_dir`, `acp_registry_overrides`, global retention defaults, configured `sources`, source plugin config, and per-source `policies`.
+The config contains `agent`, `poll_interval`, `acp_registry_overrides`, and `plugins`.
+The state directory comes from `FIRSTPASS_STATE_DIR` or defaults to `~/.firstpass`, and installed plugin config is stored with the plugin record.
 
 Plugin discovery order:
 
@@ -565,7 +566,7 @@ Requirements:
 - Let users configure retention for raw source context.
 - Prefer drafts over sends for email by default.
 - Prefer read-only plugin scopes during initial setup when writes are not needed.
-- Support per-source disablement of agent processing for sensitive accounts.
+- Keep sensitive plugin scopes out of hosted-agent prompts by using local ACP targets or by not triaging those plugins.
 - Explain when configured ACP targets send prompt context to hosted model providers.
 
 Plugin executable risk is handled by the plugin trust model above.
@@ -577,7 +578,7 @@ Retention defaults should support useful product behavior without hoarding sourc
 | Normalized item and event envelopes                                             | Keep until user deletes the plugin or local database.                        | Needed for watermarks, state transitions, audit, and false-positive or false-negative review. | Delete plugin, export/import, future compaction.                   |
 | Raw or raw-ish fetched source context                                           | 30 days.                                                                     | Needed to inspect recommendations, rerun triage, and debug agent mistakes.                    | Per-source TTL: `never`, duration, or `keep`.                      |
 | Rendered human context and evidence catalog                                     | 90 days by default.                                                          | Needed to justify old recommendations without re-fetching from the source.                    | Per-source TTL.                                                    |
-| Full prompts sent to ACP targets                                                | 30 days by default.                                                          | Needed to debug recommendation quality and reproduce schema failures.                         | Global and per-source TTL; `never` allowed for sensitive accounts. |
+| Full prompts sent to ACP targets                                                | 30 days by default.                                                          | Needed to debug recommendation quality and reproduce schema failures.                         | Global TTL; future per-plugin TTLs can allow `never` for sensitive scopes. |
 | Agent reasoning or intermediate stream text                                     | Do not persist by default.                                                   | Usually not required for product behavior and may contain sensitive derived content.          | Optional debug logging with explicit opt-in.                       |
 | Recommendation summaries, options, evidence refs, approvals, and action results | Keep.                                                                        | Core product history and audit trail.                                                         | Export/delete plugin; future audit compaction.                     |
 | Draft action payloads                                                           | Keep while recommendation is active; keep approved edited payloads in audit. | Needed for approval and audit.                                                                | Per-source TTL for inactive drafts.                                |
@@ -598,7 +599,7 @@ Shared team inboxes are out of scope for this product surface until the single-u
 Team usage introduces assignment, shared policy, delegated approvals, shared credentials, multi-user audit, and conflict resolution.
 Those requirements should be treated as a later product or a major mode, not a small extension of MVP.
 
-Core status should include daemon state, last sync time per plugin, last sync error per plugin, items ingested per cycle, items recommended per cycle, action execution failures, token usage, plugin versions, ACP target, and model when the ACP target reports one.
+Core status includes agent target and source, installed plugin sync health, item counts by local state, queue counts, and event count.
 
 Users should be able to inspect one recommendation and see the exact prompt context summary, action schemas, ACP target, model when reported, token usage, and plugin validation warnings.
 
@@ -625,7 +626,7 @@ Users should be able to inspect one recommendation and see the exact prompt cont
 | Source rate limits may make frequent polling impractical.                            | Prefer plugin-rendered prompt context over raw full history; keep polling as the required sync path and add an optional webhook bridge later.                                             |
 | Plugin security is weaker than a sandboxed permission model.                         | Persist manifest metadata, document credential risks clearly, install only trusted plugins, and explore sandboxing, signed plugins, and permission prompts later.                       |
 | Prompt context can become too large for long email threads or large PRs.             | Prefer plugin-rendered prompt context over raw full history.                                                                                                                              |
-| Prompt context can leave the machine through hosted ACP targets.                     | Show ACP target disclosure during setup, persist prompt retention controls, and let sensitive accounts disable agent processing.                                                          |
+| Prompt context can leave the machine through hosted ACP targets.                     | Show ACP target disclosure during setup, persist prompt retention controls, and recommend local ACP targets or no triage for sensitive plugin scopes.                                   |
 | Cross-source prioritization may require user-specific policy that is hard to infer.  | Keep MVP sorting simple and deterministic: plugin urgency hint, snooze expiry, recency, then configured-plugin order.                                                                     |
 | Public writes and destructive actions have high reputation or durability risk.       | Treat them as high-friction approvals.                                                                                                                                                    |
 | First-party plugin behavior may drift from the protocol.                             | Use recorded fixtures and strict contract tests.                                                                                                                                          |
@@ -678,7 +679,7 @@ Phase 1: Core inbox loop
 - [x] Implement plugin discovery from explicit config paths, `~/.firstpass/plugins`, and `PATH` executables named `firstpass-src-*`.
 - [x] Implement manifest validation, trust metadata persistence, and immediate installation for configured plugins.
 - [x] Implement `firstpass plugin configure` and `firstpass plugin doctor` for the mock plugin.
-- [x] Implement the daemon sync loop with fingerprint persistence, pagination, rate-limit, cursor-invalid, permission-denied, deletion, and partial-response handling.
+- [x] Implement the daemon sync loop with fingerprint persistence, pagination, rate-limit, permission-denied, error, deletion, and partial-response handling.
 - [x] Implement item eligibility, local watermarks, simple attention policy, deterministic sorting, and item state transitions.
 - [x] Implement `firstpass list` and `firstpass view <item-id>` with compact structured output and definitive empty states.
 - [x] Implement ACP recommendation generation through `acpx/runtime` using a mocked ACP target in e2e tests.
@@ -710,11 +711,11 @@ Phase 4: Trust, privacy, and retention
 
 - [x] Implement retention policies for raw context, rendered context, prompts, drafts, attachments, and audit-preserved records.
 - [x] Implement retention cleanup jobs and e2e coverage for expiration without deleting required audit history.
-- [x] Add ACP target disclosure, hosted-model warning copy, and per-source disablement of agent processing.
+- [x] Add ACP target disclosure and hosted-model warning copy.
 - [x] Add raw ACP command redaction across logs, errors, status output, and e2e assertions.
 - [x] Persist plugin manifest metadata for publisher, version, requested scopes, capabilities, and action catalog metadata.
 - [x] Add user-facing plugin author documentation for manifests, protocol commands, trust metadata, scopes, and safety levels.
-- [x] Add export/import for local state, plugin manifests, source config without secrets, retention policies, and audit history.
+- [x] Add export/import for local state, plugin manifests, plugin config without secrets, retention policies, and audit history.
 
 Phase 5: Gmail and broader source proof after MVP
 
@@ -727,7 +728,7 @@ Phase 5: Gmail and broader source proof after MVP
 Phase 6: Polish and release readiness
 
 - [x] Add approval receipts and action audit export.
-- [x] Add richer daemon status, token usage summaries, plugin version reporting, and action failure summaries.
+- [x] Add daemon status with agent target/source, plugin sync health, item counts, queue counts, and event count.
 - [x] Harden CLI structured output, errors, no-op mutation behavior, truncation, and contextual help for agent use.
 - [x] Improve TUI visual polish, empty states, loading states, error states, and screenshot-ready demo fixtures.
 - [x] Add package publishing checks for `npm install -g firstpass` on supported Node and OS targets.

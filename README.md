@@ -175,20 +175,14 @@ The bundled Gmail plugin is demo-only and fixture-backed in this release. It doe
 
 ## Configuration
 
-Config lives at `~/.firstpass/config.yaml`. The `state_dir` setting controls where the SQLite database, plugins, ACP sessions, daemon PID, and retained artifacts are stored.
+Config lives at `~/.firstpass/config.yaml` by default.
+Set `FIRSTPASS_STATE_DIR` to change where the SQLite database, plugin state, ACP sessions, daemon PID, and retained artifacts are stored.
 
 ```yaml
 agent: null # auto-detect a provider CLI (claude, then codex, then opencode); or set an acp: target
 poll_interval: 300
-state_dir: ~/.firstpass
 acp_registry_overrides: {}
-retention:
-  raw_context_ttl: 30d
-  prompt_ttl: 30d
-  draft_ttl: active
-  attachment_ttl: 7d
-  audit_ttl: keep
-sources: []
+plugins: {}
 ```
 
 If `~/.firstpass/AGENTS.md` exists, its contents are passed to every triage as a user policy, so you can steer recommendations globally. Run `firstpass status` to see the resolved agent.

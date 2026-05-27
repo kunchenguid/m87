@@ -109,7 +109,7 @@ The human-approval boundary is satisfied at queue time: a job only exists becaus
 The job's remote effect is constrained to a **draft** PR, which is reviewable and reversible, not a merge or a comment to another person.
 
 Open decision: whether opening the draft PR needs a second explicit confirmation, or whether approval-at-queue-time plus draft-only is sufficient.
-Recommendation for MVP: draft-only, audited, no second prompt, with a per-source config gate (`fixes.enabled`, `fixes.pr_create: draft | disabled`) mirroring ezoss, so a cautious user can run "prepare + agent, but commit only / no PR."
+Recommendation for MVP: draft-only, audited, no second prompt, with a plugin config gate (`fixes.enabled`, `fixes.pr_create: draft | disabled`) mirroring ezoss, so a cautious user can run "prepare + agent, but commit only / no PR."
 
 ## Failure, Recovery, Idempotency
 
