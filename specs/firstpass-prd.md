@@ -94,7 +94,7 @@ Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as
 | Local daemon polling configured plugin accounts.                                  | Hosted sync service.                 | First-party X plugin if API access is viable.                      |
 | SQLite database under `~/.firstpass`.                                             | Mobile app.                          | Attachment summarization pipeline.                                 |
 | Commander CLI and Ink terminal inbox UI.                                          | Team inboxes.                        | Source-specific prompt packs.                                      |
-| Plugin discovery, manifest validation, and install-time trust prompts.            | Webhook server.                      | Per-source and per-account policies.                               |
+| Plugin discovery, manifest validation, and source-scope disclosure.              | Webhook server.                      | Per-source and per-account policies.                               |
 | Source plugin CLI protocol over JSON stdin/stdout.                                | Cross-device sync.                   | Approval receipts and action audit export.                         |
 | Item sync with plugin-owned cursors and explicit pagination/error semantics.      | Fully autonomous sending.            | Plugin sandboxing, signing, and permission enforcement.            |
 | Agent recommendation generation using plugin context and action schemas.          | Plugin marketplace.                  | Import/export of local state.                                      |
@@ -271,8 +271,7 @@ The approval boundary protects users from agent-selected actions executed by hon
 
 MVP must make that tradeoff visible instead of pretending it is solved by the protocol.
 This is disclosure and consent, not sandbox enforcement.
-Plugin setup shows the plugin binary path, resolved version, manifest publisher, requested source scopes, declared capabilities, action safety levels, and install source before the user enables an account.
-Third-party plugins require an explicit trust confirmation the first time they are enabled and whenever the binary path, publisher, version, or action catalog changes materially.
+Plugin setup shows the plugin binary path, resolved version, manifest publisher, requested source scopes, declared capabilities, action safety levels, and install source so users can inspect what a plugin can access and do.
 First-party plugins can be marked as bundled or verified, but the UI still shows their source scopes and write-capable actions.
 
 The product should educate users to prefer the narrowest practical source credentials, inspect OAuth scopes before authorizing a plugin, avoid untrusted third-party plugins for sensitive accounts, and disable write scopes if they only want read-only recommendations.
@@ -516,7 +515,7 @@ The exact schema can evolve, but the core tables should conceptually include:
 
 | Table                    | Fields                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plugins`                | `id`, `binary_path`, `version`, `protocol_version`, `manifest_json`, `installed_at`, `last_checked_at`, `binary_hash`, `config_json`, `cursor_json`, `status`, `last_sync_at`, `last_error` (per-instance sync state lives here; there is no separate `source_accounts` table)                                                                                                                                        |
+| `plugins`                | `id`, `binary_path`, `version`, `protocol_version`, `manifest_json`, `installed_at`, `last_checked_at`, `config_json`, `cursor_json`, `status`, `last_sync_at`, `last_error` (per-instance sync state lives here; there is no separate `source_accounts` table)                                                                                                                                                       |
 | `items`                  | `id`, `plugin_id`, `external_id`, `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `content_fingerprint`, `attention_reason`, `attention_priority_hint`, `waiting_on`, `local_state`, `local_state_activity_at`, `local_state_activity_id`, `snoozed_until`, `metadata_json`, `created_at`, `updated_at`; unique on `(plugin_id, external_id)` and item id is `<plugin_id>:<external_id>` |
 | `events`                 | `id`, `item_id`, `external_id`, `event_type`, `actor`, `occurred_at`, `metadata_json`, `created_at`                                                                                                                                                                                                                                                                                                                   |
 | `prompt_contexts`        | `id`, `item_id`, `recommendation_id`, `retention_class`, `human_context_json`, `agent_context_json`, `evidence_json`, `redaction_hints_json`, `created_at`, `expires_at`, `deleted_at`                                                                                                                                                                                                                                |
@@ -550,8 +549,8 @@ Plugin discovery order:
 
 The plugin command should be stable enough for third-party plugins in any language.
 First-party plugins can be bundled later, but the protocol should not require Go.
-Discovery does not imply trust.
-The core should show a plugin as discovered but disabled until the user reviews and enables it for at least one plugin.
+Discovery does not imply provenance or safety.
+The core should show plugin source, scope, capability, and action metadata so users can review it before installation and configuration.
 
 ## Security, Privacy, And Observability
 
@@ -625,7 +624,7 @@ Users should be able to inspect one recommendation and see the exact prompt cont
 | Email privacy expectations are much higher than GitHub issue privacy.                | Add context retention settings from the beginning and prefer drafts over sends.                                                                                                           |
 | X API access may be too expensive or unstable for a first-party plugin.              | Support read-only mode and treat X as V1 only if viable.                                                                                                                                  |
 | Source rate limits may make frequent polling impractical.                            | Prefer plugin-rendered prompt context over raw full history; keep polling as the required sync path and add an optional webhook bridge later.                                             |
-| Plugin security is weaker than a sandboxed permission model.                         | Add MVP trust prompts and source-scope disclosure, document credential risks clearly, install only trusted plugins, and explore sandboxing, signed plugins, and permission prompts later. |
+| Plugin security is weaker than a sandboxed permission model.                         | Add source-scope disclosure, document credential risks clearly, install only trusted plugins, and explore sandboxing, signed plugins, and permission prompts later.                     |
 | Prompt context can become too large for long email threads or large PRs.             | Prefer plugin-rendered prompt context over raw full history.                                                                                                                              |
 | Prompt context can leave the machine through hosted ACP targets.                     | Show ACP target disclosure during setup, persist prompt retention controls, and let sensitive accounts disable agent processing.                                                          |
 | Cross-source prioritization may require user-specific policy that is hard to infer.  | Keep MVP sorting simple and deterministic: plugin urgency hint, snooze expiry, recency, then source-account order.                                                                        |
@@ -640,7 +639,7 @@ No default test requires live network access.
 
 E2e tests should cover:
 
-- First-run init, config loading, plugin discovery, manifest validation, and trust prompts.
+- First-run init, config loading, plugin discovery, manifest validation, and immediate plugin installation.
 - Daemon sync from a mocked source plugin into a real temporary SQLite database.
 - Sync idempotency with repeated cursors, duplicate events, pagination, `rate_limited`, `cursor_invalid`, `permission_denied`, deletions, and partial responses.
 - ACP recommendation generation through a mocked ACP target using the same `acpx/runtime` path as production.
@@ -678,7 +677,7 @@ Phase 0: Project skeleton and protocol proof
 Phase 1: Core inbox loop
 
 - [x] Implement plugin discovery from explicit config paths, `~/.firstpass/plugins`, and `PATH` executables named `firstpass-src-*`.
-- [x] Implement manifest validation, trust metadata persistence, and first-enable trust confirmation for configured plugins.
+- [x] Implement manifest validation, trust metadata persistence, and immediate installation for configured plugins.
 - [x] Implement `firstpass plugin configure` and `firstpass plugin doctor` for the mock plugin.
 - [x] Implement the daemon sync loop with cursor persistence, pagination, rate-limit, cursor-invalid, permission-denied, deletion, and partial-response handling.
 - [x] Implement item eligibility, local watermarks, simple attention policy, deterministic sorting, and item state transitions.
@@ -714,7 +713,7 @@ Phase 4: Trust, privacy, and retention
 - [x] Implement retention cleanup jobs and e2e coverage for expiration without deleting required audit history.
 - [x] Add ACP target disclosure, hosted-model warning copy, and per-source disablement of agent processing.
 - [x] Add raw ACP command redaction across logs, errors, status output, and e2e assertions.
-- [x] Add plugin trust change detection for binary path, publisher, version, requested scopes, capabilities, and action catalog changes.
+- [x] Add plugin source-scope disclosure for publisher, version, requested scopes, capabilities, and action catalog metadata.
 - [x] Add user-facing plugin author documentation for manifests, protocol commands, trust metadata, scopes, and safety levels.
 - [x] Add export/import for local state, plugin manifests, source config without secrets, retention policies, and audit history.
 
