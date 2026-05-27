@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
@@ -105,7 +105,13 @@ export async function installManagedService(cliEntry) {
 }
 
 export function startDetachedDaemon(cliEntry) {
-  const { logPath } = getStatePaths();
+  const { logPath, pidPath } = getStatePaths();
+  if (existsSync(pidPath)) {
+    const pid = Number(readFileSync(pidPath, "utf8"));
+    if (Number.isInteger(pid) && isAlive(pid)) {
+      return { status: "already_running", pid };
+    }
+  }
   const child = spawn(process.execPath, [cliEntry, "daemon", "run"], {
     detached: true,
     stdio: ["ignore", "ignore", "ignore"],
@@ -113,6 +119,15 @@ export function startDetachedDaemon(cliEntry) {
   });
   child.unref();
   return { status: "started", pid: child.pid, log: logPath };
+}
+
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {

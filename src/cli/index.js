@@ -209,7 +209,11 @@ function hasRawFlag(flag) {
 }
 
 function hasHeadlessInitFlags() {
-  return process.argv.some((arg) => initHeadlessFlagNames.has(arg));
+  return process.argv.some(
+    (arg) =>
+      initHeadlessFlagNames.has(arg) ||
+      [...initHeadlessFlagNames].some((flag) => arg.startsWith(`${flag}=`)),
+  );
 }
 
 function normalizeOptionArray(value) {

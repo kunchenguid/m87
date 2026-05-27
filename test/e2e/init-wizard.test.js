@@ -119,6 +119,32 @@ describe("e2e: init wizard command contract", () => {
     }
   });
 
+  it("treats equals-form init options as headless setup flags", async () => {
+    const initialized = parse(
+      await firstpass(
+        "init",
+        "--plugin=github",
+        "--github-repo=kunchenguid/firstpass",
+      ),
+    );
+
+    expect(initialized).toMatchObject({
+      status: "initialized",
+      mode: "headless",
+      source: { type: "github", plugin: "github" },
+    });
+
+    const db = new Database(join(stateDir, "firstpass.sqlite"));
+    try {
+      const plugin = db.prepare("select * from plugins where id='github'").get();
+      expect(JSON.parse(plugin.config_json)).toMatchObject({
+        explicit_repos: ["kunchenguid/firstpass"],
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   it("does not allow internal test plugins through setup", async () => {
     const err = await firstpass(
       "init",
