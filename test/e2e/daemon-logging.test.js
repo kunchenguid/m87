@@ -68,4 +68,30 @@ describe("e2e: daemon start writes operational logs to daemon.log", () => {
     expect(log).toContain("INFO");
     expect(log).toMatch(/daemon started.*pid=\d+/);
   });
+
+  it("records the startup line after restart", async () => {
+    await firstpass("init");
+
+    await firstpass("daemon", "start");
+    started = true;
+
+    const logPath = join(stateDir, "daemon.log");
+    await waitFor(() => {
+      if (!existsSync(logPath)) return null;
+      const text = readFileSync(logPath, "utf8");
+      return text.includes("daemon started") ? text : null;
+    });
+
+    const res = await firstpass("daemon", "restart");
+    expect(res.stdout).toContain("daemon.log");
+
+    const log = await waitFor(() => {
+      const text = readFileSync(logPath, "utf8");
+      const startupLines = text.match(/daemon started.*pid=\d+/g) ?? [];
+      return startupLines.length >= 2 ? text : null;
+    });
+
+    expect(log, "daemon.log should contain both startup lines").toBeTruthy();
+    expect(log).toContain("INFO");
+  });
 });

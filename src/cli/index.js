@@ -1488,27 +1488,7 @@ daemon
         pid: Number(readFileSync(pidPath, "utf8")),
       });
     }
-    // Redirect the detached child's stdout+stderr into daemon.log (append) so
-    // the daemon's logger output is actually persisted. Previously stdio was
-    // discarded, which meant the advertised log file was never written and
-    // failures left no trace. The child dups the fd, so we close ours after.
-    mkdirSync(dirname(logPath), { recursive: true });
-    const logFd = openSync(logPath, "a");
-    let child;
-    try {
-      child = spawn(
-        process.execPath,
-        [fileURLToPath(import.meta.url), "daemon", "run"],
-        {
-          detached: true,
-          stdio: ["ignore", logFd, logFd],
-          env: process.env,
-        },
-      );
-    } finally {
-      closeSync(logFd);
-    }
-    child.unref();
+    const child = spawnDetachedDaemon(logPath);
     out({ status: "started", pid: child.pid, log: logPath });
   });
 
@@ -1537,12 +1517,19 @@ function runningDaemonPid() {
   return Number.isInteger(pid) && isAlive(pid) ? pid : null;
 }
 
-function spawnDetachedDaemon() {
-  const child = spawn(
-    process.execPath,
-    [fileURLToPath(import.meta.url), "daemon", "run"],
-    { detached: true, stdio: ["ignore", "ignore", "ignore"], env: process.env },
-  );
+function spawnDetachedDaemon(logPath) {
+  mkdirSync(dirname(logPath), { recursive: true });
+  const logFd = openSync(logPath, "a");
+  let child;
+  try {
+    child = spawn(
+      process.execPath,
+      [fileURLToPath(import.meta.url), "daemon", "run"],
+      { detached: true, stdio: ["ignore", logFd, logFd], env: process.env },
+    );
+  } finally {
+    closeSync(logFd);
+  }
   child.unref();
   return child;
 }
@@ -1578,7 +1565,7 @@ daemon
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
-    const child = spawnDetachedDaemon();
+    const child = spawnDetachedDaemon(logPath);
     out({
       status: "restarted",
       pid: child.pid,
