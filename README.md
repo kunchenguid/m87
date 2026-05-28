@@ -275,4 +275,6 @@ pnpm test           # vitest
 node src/cli/index.js <command>  # run from source, no build needed
 ```
 
+End-to-end tests run the source CLI in tracked process groups and sweep any stranded CLI or plugin subprocesses after the run.
+
 Contributions to `main` must be pushed through [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) - see [CONTRIBUTING.md](CONTRIBUTING.md).

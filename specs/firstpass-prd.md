@@ -640,6 +640,7 @@ Users should be able to inspect one recommendation and see the exact prompt cont
 ## Testing Strategy
 
 Most coverage should come from e2e tests that run the real built CLI against temporary state directories, a mocked ACP target, and mocked source plugin executables.
+The e2e harness must run CLI invocations and plugin descendants in tracked process groups with timeout and global-teardown cleanup, so failed or interrupted test runs do not strand child processes.
 Unit tests are still useful, but mostly for pure functions, schema helpers, state reducers, redaction, and small validation utilities.
 No default test requires live network access.
 
