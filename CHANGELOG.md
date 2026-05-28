@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/kunchenguid/firstpass/compare/firstpass-v0.1.1...firstpass-v0.1.2) (2026-05-28)
+
+
+### Bug Fixes
+
+* **cli:** retry failed syncs and log daemon failures ([#10](https://github.com/kunchenguid/firstpass/issues/10)) ([0150b50](https://github.com/kunchenguid/firstpass/commit/0150b507cbd0863f72bc13dbb4106d361b6ea3fd))
+
 ## [0.1.1](https://github.com/kunchenguid/firstpass/compare/firstpass-v0.1.0...firstpass-v0.1.1) (2026-05-27)
 
 
