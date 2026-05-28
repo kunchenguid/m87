@@ -3,7 +3,9 @@ import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = /** @type {Record<string, unknown>} */ (
+    await importOriginal()
+  );
   return { ...actual, execFileSync: vi.fn() };
 });
 

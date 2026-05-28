@@ -8,7 +8,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runFirstpass, waitFor } from "../support/e2e-harness.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const SLEEPER = join(repoRoot, "test", "support", "fixtures", "sleeper-with-child.js");
+const SLEEPER = join(
+  repoRoot,
+  "test",
+  "support",
+  "fixtures",
+  "sleeper-with-child.js",
+);
 
 function isAlive(pid) {
   try {
