@@ -64,7 +64,7 @@ acp_registry_overrides: {}
 plugins: {}
 ```
 
-The state directory contains the SQLite database, plugin state, ACP session directory, daemon PID file, and retained local artifacts.
+The state directory contains the SQLite database, plugin state, ACP session directory, daemon PID file, daemon log, and retained local artifacts.
 Installed plugin configuration is stored with the plugin record.
 
 ## Plugin Trust
@@ -173,6 +173,8 @@ firstpass audit receipt <approval-id>
 ```
 
 Manual `plugin add`, `plugin configure`, and `daemon start` remain available when you need to bypass setup.
+Detached and managed daemons write operational logs to `~/.firstpass/daemon.log`, which is the first place to check for source sync failures or recovery.
+Failed GitHub syncs are retried with backoff, so a transient `gh` auth or network failure should recover after credentials or connectivity return.
 Use `--github-owned` to sync source repositories for `--github-username`, or `--github-authored-external` to sync recently updated issues and PRs authored by that user outside explicitly configured repositories.
 GitHub approvals can create real comments, reviews, close/reopen state changes, and other source-visible effects declared by the plugin action catalog.
 Review `firstpass preview` output before running `firstpass approve`; destructive actions require the additional `--confirm-destructive` flag.

@@ -236,7 +236,7 @@ It does not perform live Gmail writes.
 ## Configuration
 
 Config lives at `~/.firstpass/config.yaml` by default.
-Set `FIRSTPASS_STATE_DIR` to change where the SQLite database, plugin state, ACP sessions, daemon PID, and retained artifacts are stored.
+Set `FIRSTPASS_STATE_DIR` to change where the SQLite database, plugin state, ACP sessions, daemon PID, daemon log, and retained artifacts are stored.
 
 ```yaml
 agent: null # auto-detect a provider CLI (claude, then codex, then opencode); or set an acp: target
@@ -257,6 +257,9 @@ firstpass daemon status         # report whether the daemon is running
 firstpass daemon install        # managed OS service: launchd / systemd --user / schtasks
 firstpass daemon uninstall
 ```
+
+A detached or managed daemon writes operational logs to `~/.firstpass/daemon.log`, including startup, shutdown, loop errors, sync failures, and sync recovery.
+Failed source syncs are retried with backoff instead of being parked forever; a plugin returns to active after a later successful sync.
 
 A managed daemon launched from a GUI context inherits a minimal `PATH`, so `firstpass` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs.
 Set `FIRSTPASS_SKIP_SHELLENV=1` to disable that resolution.

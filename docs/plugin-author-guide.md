@@ -108,13 +108,13 @@ The core saves returned fingerprints only after events and warnings are durably 
 
 `sync` status values are:
 
-| Status              | Meaning                                                                                        |
-| ------------------- | ---------------------------------------------------------------------------------------------- |
-| `complete`          | The returned fingerprints cover all known source activity for the request window.              |
-| `partial`           | The core should persist the response, save fingerprints, and immediately sync again.           |
-| `rate_limited`      | The core should persist returned data and wait at least `retry_after_seconds` before retrying. |
-| `permission_denied` | Credentials are missing or insufficient and the plugin should be marked unhealthy.             |
-| `error`             | Sync failed and the plugin should be marked unhealthy with the returned warning.               |
+| Status              | Meaning                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `complete`          | The returned fingerprints cover all known source activity for the request window.                    |
+| `partial`           | The core should persist the response, save fingerprints, and immediately sync again.                 |
+| `rate_limited`      | The core should persist returned data and retry after `retry_after_seconds`, capped by core backoff. |
+| `permission_denied` | Credentials are missing or insufficient; the core records the warning and retries after backoff.     |
+| `error`             | Sync failed; the core records the warning and retries after backoff.                                 |
 
 Events should use stable `external_id` values that can be inserted idempotently.
 Item events should include source-owned activity watermarks and payloads with enough detail for core projections.
@@ -160,6 +160,7 @@ When the source does not support client tokens, use natural keys or other best-e
 - Keep action schemas small and strict with `additionalProperties: false` when possible.
 - Return stable item ids, event ids, evidence ids, and source URLs.
 - Treat fingerprints as opaque plugin-owned state and make sync idempotent.
+- Put the most actionable sync warning first because FirstPass stores it as the plugin status error; include detailed diagnostics in later warnings for daemon logs.
 - Disclose all credential scopes and provenance accurately in setup documentation.
 - Prefer drafts or private source state over visible sends when the source supports it.
 - Validate and preview every remote action immediately before execution.

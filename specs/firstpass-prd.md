@@ -319,9 +319,9 @@ The `attention` object includes `should_surface`, `reason`, `waiting_on`, and op
 `status` is one of `complete`, `partial`, `rate_limited`, `permission_denied`, or `error`.
 `complete` means the fingerprints cover all source activity known to the plugin for this request window.
 `partial` means the core should persist the response, save the returned fingerprints, and immediately schedule another sync because `has_more` is true or the plugin hit a bounded page.
-`rate_limited` means the core should persist any returned data but wait at least `retry_after_seconds` before retrying the plugin.
-`permission_denied` means credentials are missing or no longer have the required scopes, so the core should mark the plugin unhealthy and avoid repeated sync attempts until the user reconfigures it.
-`error` means the plugin could not complete sync and the core should mark the plugin unhealthy with the returned warning.
+`rate_limited` means the core should persist any returned data and retry after `retry_after_seconds`, capped by core backoff.
+`permission_denied` means credentials are missing or no longer have the required scopes, so the core should record the warning and retry after backoff.
+`error` means the plugin could not complete sync, so the core should record the warning and retry after backoff.
 
 Pagination is plugin-owned.
 The core only treats a sync cycle as caught up when the latest response is `complete` and `has_more` is false.
@@ -448,7 +448,7 @@ It creates a new eligibility decision at a newer watermark and may supersede act
 
 Daemon cycle:
 
-1. Load active configured plugins.
+1. Load plugins due for sync: active plugins plus failed plugins whose retry window elapsed.
 2. Invoke plugin `sync` with saved fingerprints for each configured plugin.
 3. Upsert returned items.
 4. Insert new events idempotently by plugin, item, and event external ID.
@@ -522,7 +522,7 @@ The exact schema can evolve, but the core tables should conceptually include:
 
 | Table                    | Fields                                                                                                                                                                                                                                                                                                                                                                             |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plugins`                | `id`, `binary_path`, `version`, `protocol_version`, `manifest_json`, `installed_at`, `last_checked_at`, `config_json`, `fingerprints_json`, `status`, `last_sync_at`, `last_error` (per-instance sync state lives here; there is no separate `source_accounts` table)                                                                                                              |
+| `plugins`                | `id`, `binary_path`, `version`, `protocol_version`, `manifest_json`, `installed_at`, `last_checked_at`, `config_json`, `fingerprints_json`, `status`, `last_sync_at`, `last_error`, `consecutive_failures`, `next_retry_at` (per-instance sync and retry state lives here; there is no separate `source_accounts` table)                                                           |
 | `items`                  | `id`, `plugin_id`, `external_id`, `item_type`, `title`, `actor`, `state`, `url`, `activity_at`, `activity_id`, `content_fingerprint`, `attention_reason`, `attention_priority_hint`, `waiting_on`, `local_state`, `snoozed_until`, `metadata_json`, `source_event_id`, `created_at`, `updated_at`; unique on `(plugin_id, external_id)` and item id is `<plugin_id>:<external_id>` |
 | `events`                 | `id`, `actor`, `occurred_at`, `created_at`, `entity`, `lifecycle`, `envelope_json`, `attention_json`, `payload_json`, `item_id`, `plugin_id`, `parent_event_id`, `root_event_id`, `depth`, `schema_version`, `dedup_key`                                                                                                                                                           |
 | `prompt_contexts`        | `id`, `item_id`, `recommendation_id`, `retention_class`, `human_context_json`, `agent_context_json`, `evidence_json`, `redaction_hints_json`, `created_at`, `expires_at`, `deleted_at`                                                                                                                                                                                             |
