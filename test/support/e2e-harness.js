@@ -1,4 +1,4 @@
-import { execFile, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -43,6 +43,20 @@ function trackChild(child) {
 /** Kill a child's whole process group (CLI parent + plugin grandchildren). */
 export function killChild(child, signal = "SIGKILL") {
   if (!child || child.pid === undefined) return;
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+        stdio: "ignore",
+      });
+    } catch {
+      try {
+        child.kill(signal);
+      } catch {
+        // already gone
+      }
+    }
+    return;
+  }
   try {
     // Detached children lead their own group; the negative pid signals the
     // whole group, so plugin grandchildren die with the CLI parent.

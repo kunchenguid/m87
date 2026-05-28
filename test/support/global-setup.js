@@ -22,6 +22,42 @@ export async function setup() {
   await rm(pidDir, { recursive: true, force: true });
 }
 
+async function getCommand(pid) {
+  if (process.platform === "win32") {
+    const { stdout } = await execFileAsync("powershell.exe", [
+      "-NoProfile",
+      "-Command",
+      `(Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}').CommandLine`,
+    ]);
+    return stdout;
+  }
+
+  const { stdout } = await execFileAsync("ps", [
+    "-o",
+    "command=",
+    "-p",
+    String(pid),
+  ]);
+  return stdout;
+}
+
+async function killProcessTree(pid) {
+  if (process.platform === "win32") {
+    await execFileAsync("taskkill", ["/pid", String(pid), "/t", "/f"]);
+    return;
+  }
+
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+  }
+}
+
 /**
  * After the whole run, reap any CLI subprocess a hard-killed worker stranded.
  * In-worker cleanup (e2e-harness `process.on("exit")`) handles the normal case;
@@ -40,12 +76,7 @@ export async function teardown() {
       if (!Number.isInteger(pid) || pid <= 1) return;
       let command;
       try {
-        ({ stdout: command } = await execFileAsync("ps", [
-          "-o",
-          "command=",
-          "-p",
-          String(pid),
-        ]));
+        command = await getCommand(pid);
       } catch {
         return; // not alive
       }
@@ -53,13 +84,9 @@ export async function teardown() {
       // repo's CLI (or a test fixture). Anything else, we leave alone.
       if (!command.includes(cliPath) && !command.includes(fixtureDir)) return;
       try {
-        process.kill(-pid, "SIGKILL");
+        await killProcessTree(pid);
       } catch {
-        try {
-          process.kill(pid, "SIGKILL");
-        } catch {
-          // already gone
-        }
+        // already gone
       }
     }),
   );
