@@ -1,15 +1,14 @@
-import { execFile } from "node:child_process";
 import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import pkg from "../../package.json" with { type: "json" };
 
-const execFileAsync = promisify(execFile);
+import { runFirstpass } from "../support/e2e-harness.js";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
 
@@ -33,10 +32,7 @@ describe("e2e: CLI entry point runs when invoked through a bin symlink", () => {
   });
 
   it("--version prints the version when run via a symlinked bin", async () => {
-    const { stdout } = await execFileAsync(process.execPath, [
-      link,
-      "--version",
-    ]);
+    const { stdout } = await runFirstpass(link, ["--version"], process.env);
     expect(stdout.trim()).toBe(pkg.version);
   });
 });

@@ -1,8 +1,6 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
-import { execFile } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,11 +10,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createMockAcpTarget,
+  runFirstpass,
   startFirstpassDaemon,
   waitFor,
 } from "../support/e2e-harness.js";
 
-const execFileAsync = promisify(execFile);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
 
@@ -45,8 +43,7 @@ describe("e2e: daemon run shuts down promptly while a slow turn is in flight", (
   let env;
   let daemon;
 
-  const firstpass = (...args) =>
-    execFileAsync(process.execPath, [CLI, ...args], { env });
+  const firstpass = (...args) => runFirstpass(CLI, args, env);
   const openDb = () => new Database(join(stateDir, "firstpass.sqlite"));
 
   beforeEach(() => {

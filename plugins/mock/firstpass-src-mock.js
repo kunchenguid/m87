@@ -18,9 +18,31 @@ const PROTOCOL_VERSION = "firstpass.plugin.v2";
 function readStdin() {
   return new Promise((resolve) => {
     let data = "";
+    let settled = false;
+    // Resolve on ANY stream termination, not just a clean `end`. A stranded
+    // plugin whose parent died without closing stdin must never hang forever
+    // eating memory, so we also resolve on `close`/`error` and cap the wait
+    // with a safety timeout (the timer is unref'd so it never keeps us alive).
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      // Detach from stdin so a still-open pipe can't keep the event loop
+      // referenced and block the process from exiting after we respond.
+      process.stdin.removeAllListeners();
+      process.stdin.pause();
+      if (typeof process.stdin.unref === "function") process.stdin.unref();
+      resolve(data);
+    };
+    const timeoutMs =
+      Number(process.env.FIRSTPASS_MOCK_STDIN_TIMEOUT_MS) || 10000;
+    const timer = setTimeout(finish, timeoutMs);
+    if (typeof timer.unref === "function") timer.unref();
     process.stdin.on("data", (c) => (data += c));
-    process.stdin.on("end", () => resolve(data));
-    if (process.stdin.isTTY) resolve("");
+    process.stdin.on("end", finish);
+    process.stdin.on("close", finish);
+    process.stdin.on("error", finish);
+    if (process.stdin.isTTY) finish();
   });
 }
 

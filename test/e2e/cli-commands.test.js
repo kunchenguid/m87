@@ -1,9 +1,7 @@
-import { execFile } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import Database from "better-sqlite3";
 import yaml from "js-yaml";
@@ -13,11 +11,11 @@ import pkg from "../../package.json" with { type: "json" };
 
 import {
   createMockAcpTarget,
+  runFirstpass,
   startFirstpassDaemon,
   waitFor,
 } from "../support/e2e-harness.js";
 
-const execFileAsync = promisify(execFile);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
 
@@ -47,8 +45,7 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
   let target;
   let daemon;
 
-  const firstpass = (...args) =>
-    execFileAsync(process.execPath, [CLI, ...args], { env });
+  const firstpass = (...args) => runFirstpass(CLI, args, env);
   const parse = ({ stdout }) => yaml.load(stdout);
   const localState = (itemId) => {
     const db = new Database(join(stateDir, "firstpass.sqlite"));
@@ -177,8 +174,9 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
 
   it("update reports up_to_date when latest == current", async () => {
     const out = parse(
-      await execFileAsync(process.execPath, [CLI, "update"], {
-        env: { ...env, FIRSTPASS_LATEST_VERSION: pkg.version },
+      await runFirstpass(CLI, ["update"], {
+        ...env,
+        FIRSTPASS_LATEST_VERSION: pkg.version,
       }),
     );
     expect(out.status).toBe("up_to_date");

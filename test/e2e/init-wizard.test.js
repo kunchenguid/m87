@@ -1,17 +1,14 @@
-import { execFile } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import Database from "better-sqlite3";
 import yaml from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { waitFor } from "../support/e2e-harness.js";
+import { runFirstpass, waitFor } from "../support/e2e-harness.js";
 
-const execFileAsync = promisify(execFile);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
 
@@ -20,8 +17,7 @@ describe("e2e: init wizard command contract", () => {
   let stateDir;
   let env;
 
-  const firstpass = (...args) =>
-    execFileAsync(process.execPath, [CLI, ...args], { env });
+  const firstpass = (...args) => runFirstpass(CLI, args, env);
   const parse = ({ stdout }) => yaml.load(stdout);
 
   beforeEach(() => {
