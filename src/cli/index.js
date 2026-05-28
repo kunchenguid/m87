@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from "node:child_process";
 import {
+  closeSync,
   constants,
   existsSync,
+  mkdirSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -29,7 +32,9 @@ import {
 import { createControlServer, sendControl } from "../core/control.js";
 import { createDatabase } from "../core/database.js";
 import { makeEvent } from "../core/event.js";
+import { createLogger } from "../core/log.js";
 import { deadLetterCount, enqueue, pendingCount } from "../core/queue.js";
+import { selectPluginsDueForSync } from "../core/scheduler.js";
 import {
   pluginConfigure,
   pluginDoctor,
@@ -1349,8 +1354,14 @@ daemon
   .description("Run the daemon loop in the foreground")
   .option("--once", "process the queue once and exit")
   .action(async (options) => {
+    // The daemon's stdout/stderr are redirected to daemon.log by `daemon start`
+    // (and by the launchd/systemd service), so this logger is the daemon's
+    // operational record. onError funnels loop/effect errors into the same file.
+    const logger = createLogger();
     const runtime = openRuntime({
-      onError: (e) => process.stderr.write(`warn: ${e.message}\n`),
+      logger,
+      onError: (e) =>
+        logger.error("loop error", { error: e?.message ?? String(e) }),
     });
     const { pidPath, controlAddress } = getStatePaths();
     if (options.once) {
@@ -1402,6 +1413,10 @@ daemon
     // Advertise liveness only once the control channel is bound, so any client
     // that sees the pidfile can reach us.
     writeFileSync(pidPath, String(process.pid));
+    logger.info("daemon started", {
+      pid: process.pid,
+      poll_interval: runtime.config.poll_interval ?? 300,
+    });
     let lastSync = 0;
     try {
       await runtime.loop.runForever({
@@ -1417,6 +1432,7 @@ daemon
         },
       });
     } finally {
+      logger.info("daemon stopping", { pid: process.pid });
       control.close();
       // Give aborted effects a brief, bounded window to cancel their agent
       // turns; cap it so a wedged child can never block shutdown.
@@ -1453,9 +1469,9 @@ function sweepTtl(db) {
 }
 
 async function scheduleSync(runtime) {
-  const plugins = runtime.db
-    .prepare("select id from plugins where status='active' or status is null")
-    .all();
+  // Active/never-synced plugins, plus any failed plugin whose backoff window
+  // has elapsed - so a transient failure self-heals instead of latching off.
+  const plugins = selectPluginsDueForSync(runtime.db, new Date().toISOString());
   for (const p of plugins) {
     runtime.loop.launchEffect({ type: "sync", plugin_id: p.id });
   }
@@ -1472,15 +1488,26 @@ daemon
         pid: Number(readFileSync(pidPath, "utf8")),
       });
     }
-    const child = spawn(
-      process.execPath,
-      [fileURLToPath(import.meta.url), "daemon", "run"],
-      {
-        detached: true,
-        stdio: ["ignore", "ignore", "ignore"],
-        env: process.env,
-      },
-    );
+    // Redirect the detached child's stdout+stderr into daemon.log (append) so
+    // the daemon's logger output is actually persisted. Previously stdio was
+    // discarded, which meant the advertised log file was never written and
+    // failures left no trace. The child dups the fd, so we close ours after.
+    mkdirSync(dirname(logPath), { recursive: true });
+    const logFd = openSync(logPath, "a");
+    let child;
+    try {
+      child = spawn(
+        process.execPath,
+        [fileURLToPath(import.meta.url), "daemon", "run"],
+        {
+          detached: true,
+          stdio: ["ignore", logFd, logFd],
+          env: process.env,
+        },
+      );
+    } finally {
+      closeSync(logFd);
+    }
     child.unref();
     out({ status: "started", pid: child.pid, log: logPath });
   });

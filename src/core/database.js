@@ -72,6 +72,8 @@ create table plugins (
   status text,
   last_sync_at text,
   last_error text,
+  consecutive_failures integer not null default 0, -- transient-failure streak (backoff input)
+  next_retry_at text,                  -- when a failed plugin re-enters the sync rotation
   installed_at text not null,
   last_checked_at text
 );
@@ -269,16 +271,36 @@ function initialize(database) {
   const row = database
     .prepare("select value from schema_meta where key = 'version'")
     .get();
-  if (row) {
-    return; // already initialized
+  if (!row) {
+    const apply = database.transaction(() => {
+      database.exec(schema);
+      database
+        .prepare("insert into schema_meta (key, value) values ('version', ?)")
+        .run(String(SCHEMA_VERSION));
+    });
+    apply();
   }
-  const apply = database.transaction(() => {
-    database.exec(schema);
-    database
-      .prepare("insert into schema_meta (key, value) values ('version', ?)")
-      .run(String(SCHEMA_VERSION));
+  // Forward-only, idempotent column additions for databases created before a
+  // column existed. SQLite has no `add column if not exists`, so we probe the
+  // table shape first. Safe to run on every open.
+  ensureColumns(database, "plugins", {
+    consecutive_failures: "integer not null default 0",
+    next_retry_at: "text",
   });
-  apply();
+}
+
+function ensureColumns(database, table, columns) {
+  const existing = new Set(
+    database
+      .prepare(`pragma table_info(${table})`)
+      .all()
+      .map((c) => c.name),
+  );
+  for (const [name, decl] of Object.entries(columns)) {
+    if (!existing.has(name)) {
+      database.exec(`alter table ${table} add column ${name} ${decl}`);
+    }
+  }
 }
 
 export { SCHEMA_VERSION };

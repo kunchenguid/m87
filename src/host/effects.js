@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { runAcpTurn } from "../agent/acp.js";
+import { noopLogger } from "../core/log.js";
+import { syncRetryDelayMs } from "../core/scheduler.js";
 import {
   buildFixPrompt,
   buildTriagePrompt,
@@ -40,10 +42,10 @@ function loadItem(db, itemId) {
 
 /**
  * Build the four effect runners, closing over the daemon context.
- * @param {{ db, stateDir, config, agentSpec }} ctx
+ * @param {{ db, stateDir, config?, agentSpec?, logger? }} ctx
  */
 export function createEffects(ctx) {
-  const { db, stateDir, config = {}, agentSpec } = ctx;
+  const { db, stateDir, config = {}, agentSpec, logger = noopLogger } = ctx;
 
   // sync: plugin diff -> root item events; persist the fingerprint baseline.
   async function sync(spec, api) {
@@ -62,9 +64,32 @@ export function createEffects(ctx) {
       res.status === "permission_denied" ||
       res.status === "error"
     ) {
+      // Transient failure: park behind a backoff window instead of dropping the
+      // plugin from the rotation. The scheduler re-enters it once next_retry_at
+      // elapses, so a flaky `gh auth status` or a rate-limit window self-heals.
+      const failures = (plugin.consecutive_failures ?? 0) + 1;
+      // last_error keeps the clean, actionable first warning (it surfaces in
+      // `firstpass status`); the log gets every warning so the real cause is
+      // recorded even when the headline message is generic guidance.
+      const lastError = res.warnings?.[0] ?? res.status;
+      const detail = res.warnings?.join("; ") || res.status;
+      const at = nowIso();
+      const nextRetryAt = new Date(
+        Date.parse(at) + syncRetryDelayMs(failures, res.retry_after_seconds),
+      ).toISOString();
       db.prepare(
-        "update plugins set status=?, last_error=?, last_sync_at=? where id=?",
-      ).run(res.status, res.warnings?.[0] ?? res.status, nowIso(), plugin.id);
+        `update plugins
+           set status=?, last_error=?, last_sync_at=?,
+               consecutive_failures=?, next_retry_at=?
+         where id=?`,
+      ).run(res.status, lastError, at, failures, nextRetryAt, plugin.id);
+      logger.warn("plugin sync failed", {
+        plugin: plugin.id,
+        status: res.status,
+        attempt: failures,
+        next_retry_at: nextRetryAt,
+        error: detail,
+      });
       return;
     }
     for (const pe of res.events) {
@@ -72,13 +97,20 @@ export function createEffects(ctx) {
         lane: "background",
       });
     }
+    const recovered = (plugin.consecutive_failures ?? 0) > 0;
     db.prepare(
-      "update plugins set fingerprints_json=?, status='active', last_error=null, last_sync_at=? where id=?",
+      `update plugins
+         set fingerprints_json=?, status='active', last_error=null,
+             last_sync_at=?, consecutive_failures=0, next_retry_at=null
+       where id=?`,
     ).run(
       JSON.stringify(res.fingerprints ?? fingerprints),
       nowIso(),
       plugin.id,
     );
+    if (recovered) {
+      logger.info("plugin sync recovered", { plugin: plugin.id });
+    }
   }
 
   // triage: fetch context -> agent turn -> recommendation.created (child of the

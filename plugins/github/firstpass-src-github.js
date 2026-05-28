@@ -949,6 +949,11 @@ const syncGithubSource = async (input) => {
         isMissingGhError(error)
           ? "GitHub CLI `gh` was not found; install gh and retry."
           : "GitHub CLI authentication is required for live sync; run `gh auth login` and retry.",
+        // The actionable guidance above stays first (it is what surfaces in
+        // status); the real `gh` failure rides along as a second warning so the
+        // daemon log captures WHY auth-status failed (a network blip looks
+        // different from a genuine sign-out).
+        `gh auth status failed: ${sanitizeGhError(error)}`,
       ],
     };
   }

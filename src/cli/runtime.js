@@ -1,25 +1,26 @@
 import { resolveEffectiveAgentSpec } from "../agent/detect.js";
 import { createDatabase } from "../core/database.js";
+import { noopLogger } from "../core/log.js";
 import { createLoop } from "../core/loop.js";
 import { createEffects } from "../host/effects.js";
 import { getStatePaths, loadConfig } from "./state.js";
 
 /**
  * Open the database and build a loop wired to the real effects (plugin + agent)
- * for the current config. Returns { db, loop, config, agentSpec }.
+ * for the current config. Returns { db, loop, config, agentSpec, logger }.
  */
-export function openRuntime({ onError = undefined } = {}) {
+export function openRuntime({ onError = undefined, logger = noopLogger } = {}) {
   const { dbPath, stateDir } = getStatePaths();
   const config = loadConfig();
   const db = createDatabase(dbPath);
   const agentSpec = resolveEffectiveAgentSpec(config);
-  const effects = createEffects({ db, stateDir, config, agentSpec });
+  const effects = createEffects({ db, stateDir, config, agentSpec, logger });
   const loop = createLoop({
     db,
     effects,
     onError: onError ?? (() => {}),
   });
-  return { db, loop, config, agentSpec, stateDir };
+  return { db, loop, config, agentSpec, stateDir, logger };
 }
 
 /**
