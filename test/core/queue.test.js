@@ -31,7 +31,7 @@ describe("core/queue", () => {
   let dir;
   let db;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-q-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-q-"));
     db = createDatabase(join(dir, "q.sqlite"));
   });
   afterEach(() => {

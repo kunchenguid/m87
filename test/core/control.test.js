@@ -16,7 +16,7 @@ describe("core/control IPC channel", () => {
   let server;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-ctl-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-ctl-"));
     address = controlAddress(dir);
   });
 

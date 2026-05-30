@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const MOCK = fileURLToPath(
-  new URL("../../plugins/mock/firstpass-src-mock.js", import.meta.url),
+  new URL("../../plugins/mock/m87-src-mock.js", import.meta.url),
 );
 
 describe("mock source plugin: stdin handling", () => {
@@ -16,7 +16,7 @@ describe("mock source plugin: stdin handling", () => {
   it("self-terminates instead of hanging when stdin never closes", async () => {
     const child = spawn(process.execPath, [MOCK, "manifest"], {
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, FIRSTPASS_MOCK_STDIN_TIMEOUT_MS: "200" },
+      env: { ...process.env, M87_MOCK_STDIN_TIMEOUT_MS: "200" },
     });
 
     let stdout = "";

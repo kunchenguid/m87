@@ -28,7 +28,7 @@ describe("tui/InboxView", () => {
       notice: "",
       selectedIndex: 0,
     });
-    expect(out).toContain("firstpass");
+    expect(out).toContain("m87");
     expect(out.toLowerCase()).toContain("inbox");
     expect(out).toContain("nothing waiting");
     // keybinding hints are always visible
@@ -141,11 +141,11 @@ describe("tui/InboxView", () => {
             hasAutomation: false,
             confidence: "high",
             meta: {
-              handle: "kunchenguid/firstpass · PR #221",
+              handle: "kunchenguid/m87 · PR #221",
               age: "2h",
               waiting: null,
-              lead: "kunchenguid/firstpass · PR #221 · 2h",
-              text: "kunchenguid/firstpass · PR #221 · 2h",
+              lead: "kunchenguid/m87 · PR #221 · 2h",
+              text: "kunchenguid/m87 · PR #221 · 2h",
             },
           },
         ],
@@ -171,7 +171,7 @@ describe("tui/InboxView", () => {
       // a roomy terminal so the meta line is not truncated by the narrow pane
       { width: 120, height: 30 },
     );
-    expect(out).toContain("kunchenguid/firstpass");
+    expect(out).toContain("kunchenguid/m87");
     expect(out).toContain("PR #221");
     expect(out).toContain("2h");
   });
@@ -468,7 +468,7 @@ describe("tui/InfoView", () => {
       }),
     );
     expect(out.toLowerCase()).toContain("offline");
-    expect(out).toContain("firstpass daemon start");
+    expect(out).toContain("m87 daemon start");
     expect(out).toContain("3");
   });
 });

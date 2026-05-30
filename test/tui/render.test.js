@@ -19,7 +19,7 @@ describe("tui/render", () => {
   let dir;
   let db;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-tui-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-tui-"));
     db = createDatabase(join(dir, "t.sqlite"));
     db.prepare(
       `insert into plugins (id, binary_path, version, protocol_version, manifest_json, installed_at) values ('mock','/b','1','v1','{}','t')`,
@@ -32,7 +32,7 @@ describe("tui/render", () => {
 
   it("renders an empty inbox", () => {
     const view = renderInboxView(db, { agentTarget: "acp:claude" });
-    expect(view).toContain("FirstPass Inbox  (0 items)");
+    expect(view).toContain("M87 Inbox  (0 items)");
     expect(view).toContain("nothing waiting on you");
     expect(view).toContain("agent=acp:claude");
   });

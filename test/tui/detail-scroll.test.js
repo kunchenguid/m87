@@ -125,7 +125,7 @@ describe("tui detail scroll + item nav", () => {
   beforeEach(() => {
     priorCi = process.env.CI;
     process.env.CI = "true";
-    dir = mkdtempSync(join(tmpdir(), "firstpass-scroll-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-scroll-"));
     db = createDatabase(join(dir, "t.sqlite"));
     db.prepare(
       `insert into plugins (id, binary_path, version, protocol_version, manifest_json, installed_at) values ('mock','/b','1','v1','{}','t')`,

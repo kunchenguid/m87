@@ -7,7 +7,7 @@ import Database from "better-sqlite3";
 import yaml from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runFirstpass, waitFor } from "../support/e2e-harness.js";
+import { runM87, waitFor } from "../support/e2e-harness.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
@@ -17,19 +17,19 @@ describe("e2e: init wizard command contract", () => {
   let stateDir;
   let env;
 
-  const firstpass = (...args) => runFirstpass(CLI, args, env);
+  const m87 = (...args) => runM87(CLI, args, env);
   const parse = ({ stdout }) => yaml.load(stdout);
 
   beforeEach(() => {
-    homeDir = mkdtempSync(join(tmpdir(), "firstpass-init-"));
-    stateDir = join(homeDir, ".firstpass");
+    homeDir = mkdtempSync(join(tmpdir(), "m87-init-"));
+    stateDir = join(homeDir, ".m87");
     env = {
       ...process.env,
       HOME: homeDir,
-      FIRSTPASS_STATE_DIR: stateDir,
-      FIRSTPASS_AGENT_PROBE_PATH: "",
-      FIRSTPASS_SERVICE_DRY_RUN: "1",
-      FIRSTPASS_SKIP_SHELLENV: "1",
+      M87_STATE_DIR: stateDir,
+      M87_AGENT_PROBE_PATH: "",
+      M87_SERVICE_DRY_RUN: "1",
+      M87_SKIP_SHELLENV: "1",
     };
   });
 
@@ -38,13 +38,13 @@ describe("e2e: init wizard command contract", () => {
   });
 
   it("preserves non-TTY init as the existing idempotent YAML bootstrap", async () => {
-    const initialized = parse(await firstpass("init"));
+    const initialized = parse(await m87("init"));
 
     expect(initialized).toEqual({
       status: "initialized",
       state_dir: stateDir,
     });
-    expect(existsSync(join(stateDir, "firstpass.sqlite"))).toBe(true);
+    expect(existsSync(join(stateDir, "m87.sqlite"))).toBe(true);
     expect(
       yaml.load(readFileSync(join(stateDir, "config.yaml"), "utf8")),
     ).toMatchObject({
@@ -54,7 +54,7 @@ describe("e2e: init wizard command contract", () => {
   });
 
   it("fails clearly when the wizard is forced without a TTY", async () => {
-    const err = await firstpass("init", "--wizard").catch((error) => error);
+    const err = await m87("init", "--wizard").catch((error) => error);
 
     expect(err.code).toBe(2);
     expect(err.stderr).toContain("--wizard requires an interactive terminal");
@@ -62,7 +62,7 @@ describe("e2e: init wizard command contract", () => {
 
   it("runs headless defaults with --yes and an explicit service opt-out", async () => {
     const initialized = parse(
-      await firstpass("init", "--yes", "--no-install-service"),
+      await m87("init", "--yes", "--no-install-service"),
     );
 
     expect(initialized).toMatchObject({
@@ -72,12 +72,12 @@ describe("e2e: init wizard command contract", () => {
       source: { type: "skip" },
       service: { status: "skipped" },
     });
-    expect(initialized.commands).toContain("firstpass");
+    expect(initialized.commands).toContain("m87");
   });
 
   it("can configure GitHub with flags only", async () => {
     const initialized = parse(
-      await firstpass(
+      await m87(
         "init",
         "--yes",
         "--agent",
@@ -85,7 +85,7 @@ describe("e2e: init wizard command contract", () => {
         "--plugin",
         "github",
         "--github-repo",
-        "kunchenguid/firstpass",
+        "kunchenguid/m87",
         "--no-install-service",
       ),
     );
@@ -103,14 +103,14 @@ describe("e2e: init wizard command contract", () => {
     );
     expect(config.agent).toBe("acp:opencode");
 
-    const db = new Database(join(stateDir, "firstpass.sqlite"));
+    const db = new Database(join(stateDir, "m87.sqlite"));
     try {
       const plugin = db
         .prepare("select * from plugins where id='github'")
         .get();
       expect(plugin).toBeTruthy();
       expect(JSON.parse(plugin.config_json)).toMatchObject({
-        explicit_repos: ["kunchenguid/firstpass"],
+        explicit_repos: ["kunchenguid/m87"],
       });
     } finally {
       db.close();
@@ -119,11 +119,7 @@ describe("e2e: init wizard command contract", () => {
 
   it("treats equals-form init options as headless setup flags", async () => {
     const initialized = parse(
-      await firstpass(
-        "init",
-        "--plugin=github",
-        "--github-repo=kunchenguid/firstpass",
-      ),
+      await m87("init", "--plugin=github", "--github-repo=kunchenguid/m87"),
     );
 
     expect(initialized).toMatchObject({
@@ -132,13 +128,13 @@ describe("e2e: init wizard command contract", () => {
       source: { type: "github", plugin: "github" },
     });
 
-    const db = new Database(join(stateDir, "firstpass.sqlite"));
+    const db = new Database(join(stateDir, "m87.sqlite"));
     try {
       const plugin = db
         .prepare("select * from plugins where id='github'")
         .get();
       expect(JSON.parse(plugin.config_json)).toMatchObject({
-        explicit_repos: ["kunchenguid/firstpass"],
+        explicit_repos: ["kunchenguid/m87"],
       });
     } finally {
       db.close();
@@ -147,27 +143,22 @@ describe("e2e: init wizard command contract", () => {
 
   it("starts a background daemon with --start-daemon and leaves it running", async () => {
     const result = parse(
-      await firstpass(
-        "init",
-        "--yes",
-        "--no-install-service",
-        "--start-daemon",
-      ),
+      await m87("init", "--yes", "--no-install-service", "--start-daemon"),
     );
     expect(result.daemon).toMatchObject({ status: "started" });
 
     // The detached daemon needs a moment to boot and advertise its pidfile;
     // once up, it keeps running after the init command returns.
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
-    const status = parse(await firstpass("daemon", "status"));
+    const status = parse(await m87("daemon", "status"));
     expect(status.running).toBe(true);
 
     // Clean up the detached daemon so it does not outlive the test.
-    await firstpass("daemon", "stop");
+    await m87("daemon", "stop");
   }, 30000);
 
   it("does not allow internal test plugins through setup", async () => {
-    const err = await firstpass(
+    const err = await m87(
       "init",
       "--yes",
       "--plugin",

@@ -13,7 +13,7 @@ const detectedAgents = [
 ];
 
 const context = {
-  stateDir: "/tmp/firstpass-state",
+  stateDir: "/tmp/m87-state",
   configExists: false,
   dbExists: false,
   detectedAgent: detectedAgents[0],
@@ -37,7 +37,7 @@ describe("setup/init model", () => {
         context,
       ).screen;
 
-    // Three mutually exclusive ways to (not) run FirstPass in the background.
+    // Three mutually exclusive ways to (not) run M87 in the background.
     const screen = at({ installService: true, startDaemon: true });
     expect(screen.choices.map((choice) => choice.id)).toEqual([
       "service",
@@ -97,7 +97,7 @@ describe("setup/init model", () => {
       customAgent: "acp:opencode",
       source: "github",
       githubScope: "explicit",
-      githubRepos: ["kunchenguid/firstpass"],
+      githubRepos: ["kunchenguid/m87"],
       installService: false,
       startDaemon: false,
     };
@@ -111,9 +111,9 @@ describe("setup/init model", () => {
     expect(plan.source).toMatchObject({
       type: "github",
       pluginId: "github",
-      config: { explicit_repos: ["kunchenguid/firstpass"] },
+      config: { explicit_repos: ["kunchenguid/m87"] },
     });
-    expect(plan.commands).toContain("firstpass plugin add github");
+    expect(plan.commands).toContain("m87 plugin add github");
     expect(plan.commands.join("\n")).not.toContain("mock");
   });
 
@@ -270,7 +270,7 @@ describe("setup/init model", () => {
       source: "github",
       installService: true,
       startDaemon: true,
-      githubRepos: ["kunchenguid/firstpass"],
+      githubRepos: ["kunchenguid/m87"],
     };
     const screens = [
       { ...base, currentStep: "agent" },

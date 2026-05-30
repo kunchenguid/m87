@@ -11,7 +11,7 @@ import { createEffects } from "../../src/host/effects.js";
 
 // A minimal fake plugin that answers detect-automation-pr based on an env flag.
 async function writeFakeDetectPlugin(found) {
-  const dir = await mkdtemp(join(tmpdir(), "firstpass-detect-plugin-"));
+  const dir = await mkdtemp(join(tmpdir(), "m87-detect-plugin-"));
   const path = join(dir, "plugin.js");
   await writeFile(
     path,
@@ -48,7 +48,7 @@ describe("host/effects fix_detect (FU-15)", () => {
   let dir;
   let db;
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "firstpass-detect-"));
+    dir = await mkdtemp(join(tmpdir(), "m87-detect-"));
     db = createDatabase(join(dir, "t.sqlite"));
   });
   afterEach(() => {
@@ -58,7 +58,7 @@ describe("host/effects fix_detect (FU-15)", () => {
   async function seed(binaryPath) {
     db.prepare(
       `insert into plugins (id, binary_path, version, protocol_version, manifest_json, config_json, status, installed_at)
-       values ('github', ?, '2', 'firstpass.plugin.v2', '{}', '{}', 'active', 't')`,
+       values ('github', ?, '2', 'm87.plugin.v2', '{}', '{}', 'active', 't')`,
     ).run(binaryPath);
     project(
       db,
@@ -80,7 +80,7 @@ describe("host/effects fix_detect (FU-15)", () => {
     db.prepare(
       `insert into jobs (id, item_id, kind, status, phase, prompt, metadata_json, created_at, updated_at)
        values ('job-1','github:github:pr:o/r/5','fix','running','waiting_for_pr','', ?, 't','t')`,
-    ).run(JSON.stringify({ branch: "firstpass/fix-job-1", repository: "o/r" }));
+    ).run(JSON.stringify({ branch: "m87/fix-job-1", repository: "o/r" }));
   }
 
   it("closes the job succeeded when the PR is detected", async () => {

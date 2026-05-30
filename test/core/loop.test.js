@@ -108,7 +108,7 @@ describe("core/loop (integration)", () => {
   let dir;
   let db;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-loop-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-loop-"));
     db = createDatabase(join(dir, "l.sqlite"));
     seedPlugin(db);
   });

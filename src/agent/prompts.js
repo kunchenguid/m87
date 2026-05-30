@@ -4,7 +4,7 @@ import { join } from "node:path";
 // Prompt assembly for the two agent-using jobs: triage (produce a
 // recommendation) and fix (edit a workspace). Kept core-internal.
 
-// User triage policy (FU-17): if ~/.firstpass/AGENTS.md exists its contents are
+// User triage policy (FU-17): if ~/.m87/AGENTS.md exists its contents are
 // appended to every triage prompt, so the operator can steer triage globally.
 export function loadUserPolicy(stateDir) {
   if (typeof stateDir !== "string" || stateDir.length === 0) {
@@ -20,7 +20,7 @@ export function loadUserPolicy(stateDir) {
 
 export function buildTriagePrompt(input) {
   return [
-    "You are triaging a local-first FirstPass review item.",
+    "You are triaging a local-first M87 review item.",
     "Use the provided prompt context to produce a recommendation for what should happen next.",
     "Core policy: propose one to three grounded options, do not claim actions were taken, and respect that source-visible effects require explicit human approval.",
     "User policy, plugin source context, evidence, action catalog, and rerun instructions are provided in the Input object when available.",
@@ -76,10 +76,10 @@ export function buildTriagePrompt(input) {
 
 export function buildFixPrompt(prompt, workspacePath) {
   return [
-    "You are an FirstPass automation worker running a coding task.",
+    "You are an M87 automation worker running a coding task.",
     `A working copy of the repository is checked out at: ${workspacePath}`,
     "Make the change described below directly in that working copy.",
-    "Do not commit, push, or open a pull request yourself; FirstPass handles that after you finish.",
+    "Do not commit, push, or open a pull request yourself; M87 handles that after you finish.",
     "",
     "Task:",
     typeof prompt === "string" ? prompt : "",

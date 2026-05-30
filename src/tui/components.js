@@ -40,7 +40,7 @@ function Header({ model, width }) {
       flexDirection: "row",
       alignItems: "center",
     },
-    h(Chip, { label: "firstpass", color: theme.accent }),
+    h(Chip, { label: "m87", color: theme.accent }),
     h(Text, { color: theme.muted }, "  review queue  "),
     h(Box, { flexGrow: 1 }),
     live,
@@ -460,7 +460,7 @@ export function InfoView({ model, width = 100, height = 30 }) {
     h(
       Box,
       { marginBottom: 1, flexDirection: "row", alignItems: "center" },
-      h(Chip, { label: "firstpass", color: theme.accent }),
+      h(Chip, { label: "m87", color: theme.accent }),
       h(Text, { color: theme.muted }, "  info"),
     ),
 
@@ -470,7 +470,7 @@ export function InfoView({ model, width = 100, height = 30 }) {
       : h(
           InfoRow,
           { label: "" },
-          h(Text, { color: theme.dim }, "start with `firstpass daemon start`"),
+          h(Text, { color: theme.dim }, "start with `m87 daemon start`"),
         ),
     h(
       InfoRow,

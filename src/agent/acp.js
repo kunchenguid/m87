@@ -116,9 +116,7 @@ export async function runAcpTurn({
     // down instead of holding the event loop open with a half-finished turn.
     if (signal) {
       onAbort = () => {
-        runtime
-          .close({ handle, reason: "firstpass-aborted" })
-          .catch(() => undefined);
+        runtime.close({ handle, reason: "m87-aborted" }).catch(() => undefined);
       };
       if (signal.aborted) {
         onAbort();
@@ -167,7 +165,7 @@ export async function runAcpTurn({
     }
     if (handle !== undefined) {
       await runtime
-        .close({ handle, reason: "firstpass-turn-complete" })
+        .close({ handle, reason: "m87-turn-complete" })
         .catch(() => undefined);
     }
     await rm(sessionStateDir, { recursive: true, force: true }).catch(

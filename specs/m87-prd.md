@@ -1,14 +1,14 @@
-# firstpass PRD And Technical Design
+# m87 PRD And Technical Design
 
 ## Pitch
 
-`firstpass` (meaning "agent queue") is a local-first agentic queue that ingests updates from many personal and work sources, asks an agent to triage each item, and lets the user approve, edit, or dismiss recommended actions before anything is sent back.
+`m87` (meaning "agent queue") is a local-first agentic queue that ingests updates from many personal and work sources, asks an agent to triage each item, and lets the user approve, edit, or dismiss recommended actions before anything is sent back.
 
 The durable insight is the local recommendation and approval loop: agents investigate and recommend actions, humans decide, and remote writes happen only after approval.
 
 People receive work across GitHub, email, Slack, Discord, X, Google Docs, calendar invites, support queues, and internal systems.
 Each surface has its own notification model, unread state, labels, permissions, and reply UI.
-`firstpass` gives the user one trusted review queue for items that need attention, with concise agent recommendations and safe action buttons.
+`m87` gives the user one trusted review queue for items that need attention, with concise agent recommendations and safe action buttons.
 
 The product runs locally by default, keeps private reasoning and drafts on the user's machine, and treats every source as a plugin.
 The core does not understand GitHub, Gmail, X, or any other source in detail.
@@ -92,7 +92,7 @@ Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as
 | MVP includes                                                                         | MVP excludes                         | V1 adds                                                                         |
 | ------------------------------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------- |
 | Local daemon polling configured plugins.                                             | Hosted sync service.                 | First-party X plugin if API access is viable.                                   |
-| SQLite database under `~/.firstpass`.                                                | Mobile app.                          | Attachment summarization pipeline.                                              |
+| SQLite database under `~/.m87`.                                                      | Mobile app.                          | Attachment summarization pipeline.                                              |
 | Commander CLI and Ink terminal inbox UI.                                             | Team inboxes.                        | Source-specific prompt packs.                                                   |
 | Bundled plugin installation, manifest validation, and manifest metadata persistence. | Webhook server.                      | Per-source and per-account policies.                                            |
 | Source plugin CLI protocol over JSON stdin/stdout.                                   | Cross-device sync.                   | Approval receipts and action audit export.                                      |
@@ -112,12 +112,12 @@ Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as
 ### Setup
 
 ```sh
-firstpass init
-firstpass
+m87 init
+m87
 ```
 
 The first-run setup wizard initializes local state, lets the user use auto-detect or pick a detected AI agent, offers GitHub or skip source setup, and finishes with a background-run choice: launch at login, this session only, or not yet.
-Scripted setup uses `firstpass init --yes --plugin github --github-repo owner/repo`, or `--plugin skip` when a source should be configured later.
+Scripted setup uses `m87 init --yes --plugin github --github-repo owner/repo`, or `--plugin skip` when a source should be configured later.
 The interactive flow is agent choice, source choice, then review and finish.
 A configured plugin is the unit of scope; there is no separate source-account object.
 
@@ -154,37 +154,37 @@ Core actions:
 Recommended CLI surface:
 
 ```sh
-firstpass                    # open TUI
-firstpass list               # list active recommendations
-firstpass status             # daemon and source status
-firstpass triage <item-id>   # rerun triage for one item
-firstpass approve <rec-id>   # approve from CLI
-firstpass dismiss <item-id>  # dismiss locally
-firstpass snooze <item-id> 7d
-firstpass plugin configure <plugin> --config key=value
-firstpass plugin sync <plugin>
-firstpass plugin list
-firstpass plugin doctor
-firstpass daemon start
-firstpass daemon stop
+m87                    # open TUI
+m87 list               # list active recommendations
+m87 status             # daemon and source status
+m87 triage <item-id>   # rerun triage for one item
+m87 approve <rec-id>   # approve from CLI
+m87 dismiss <item-id>  # dismiss locally
+m87 snooze <item-id> 7d
+m87 plugin configure <plugin> --config key=value
+m87 plugin sync <plugin>
+m87 plugin list
+m87 plugin doctor
+m87 daemon start
+m87 daemon stop
 ```
 
 ## Product Model
 
-| Concept        | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Source plugin  | First-party or third-party executable implementing the `firstpass` plugin protocol; invoked by the core with command names and JSON payloads. A configured plugin is the unit of scope: it owns a single scope `config`, a single opaque sync fingerprint baseline, rate-limit state, and plugin-owned credentials. Running multiple identities of one source (two GitHub logins, two Gmail mailboxes) is the plugin's own responsibility, expressed inside its `config` while keeping `external_id`s unique; the core does not model separate accounts. |
-| Item           | Source-neutral object that may need triage, such as a GitHub PR, Gmail thread, X reply, Linear issue, or Slack thread; stored as a normalized envelope plus plugin metadata JSON.                                                                                                                                                                                                                                                                                                                                                                        |
-| Event          | Source-side change that may affect attention, such as a new email, PR review, tweet reply, or status change; core needs stable IDs, timestamps, actor identity, and plugin attention signal.                                                                                                                                                                                                                                                                                                                                                             |
-| Recommendation | One agent run against one item at one observed activity watermark; contains one or more options; only one active recommendation per item.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Option         | Complete proposed next step with title, rationale, confidence, waiting state, proposed plugin actions, and optional automation jobs.                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Action         | Plugin-defined remote operation such as reply, archive, close, merge, label, mute, block, assign, or create draft; core stores and displays it while plugin validates and executes it.                                                                                                                                                                                                                                                                                                                                                                   |
-| Automation job | Longer-running operation triggered by an option, such as a GitHub coding-agent fix, a Gmail long-response draft using related documents, or a Linear spec or child-issue creation.                                                                                                                                                                                                                                                                                                                                                                       |
+| Concept        | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source plugin  | First-party or third-party executable implementing the `m87` plugin protocol; invoked by the core with command names and JSON payloads. A configured plugin is the unit of scope: it owns a single scope `config`, a single opaque sync fingerprint baseline, rate-limit state, and plugin-owned credentials. Running multiple identities of one source (two GitHub logins, two Gmail mailboxes) is the plugin's own responsibility, expressed inside its `config` while keeping `external_id`s unique; the core does not model separate accounts. |
+| Item           | Source-neutral object that may need triage, such as a GitHub PR, Gmail thread, X reply, Linear issue, or Slack thread; stored as a normalized envelope plus plugin metadata JSON.                                                                                                                                                                                                                                                                                                                                                                  |
+| Event          | Source-side change that may affect attention, such as a new email, PR review, tweet reply, or status change; core needs stable IDs, timestamps, actor identity, and plugin attention signal.                                                                                                                                                                                                                                                                                                                                                       |
+| Recommendation | One agent run against one item at one observed activity watermark; contains one or more options; only one active recommendation per item.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Option         | Complete proposed next step with title, rationale, confidence, waiting state, proposed plugin actions, and optional automation jobs.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Action         | Plugin-defined remote operation such as reply, archive, close, merge, label, mute, block, assign, or create draft; core stores and displays it while plugin validates and executes it.                                                                                                                                                                                                                                                                                                                                                             |
+| Automation job | Longer-running operation triggered by an option, such as a GitHub coding-agent fix, a Gmail long-response draft using related documents, or a Linear spec or child-issue creation.                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Technical Architecture
 
 ```text
-source plugins             -- JSON CLI protocol -->      firstpass daemon
+source plugins             -- JSON CLI protocol -->      m87 daemon
 github, gmail, x, linear                                  sync, triage, jobs, IPC
                                                                   |
                                                                   v
@@ -219,14 +219,14 @@ Responsibilities:
 
 ## Tech Stack
 
-`firstpass` should be installable with ordinary npm tooling and must not require Bun.
+`m87` should be installable with ordinary npm tooling and must not require Bun.
 
 | Area               | Choice                                                                                          |
 | ------------------ | ----------------------------------------------------------------------------------------------- |
 | Runtime            | Node.js 22.13+.                                                                                 |
 | Source language    | Plain ESM JavaScript.                                                                           |
 | Typechecking       | `tsc --noEmit` with `allowJs` and `checkJs`; no JSDoc type annotations in implementation files. |
-| Package manager    | `pnpm` for development; published package works with `npm install -g firstpass`.                |
+| Package manager    | `pnpm` for development; published package works with `npm install -g m87`.                      |
 | CLI                | Commander for scriptable commands.                                                              |
 | Human TUI          | Ink with React, written in JS, for a screenshot-worthy terminal inbox.                          |
 | Database           | SQLite via `better-sqlite3`.                                                                    |
@@ -250,20 +250,20 @@ Exit code `0` means protocol success, nonzero means transport or plugin failure,
 Recommended command shape:
 
 ```sh
-firstpass-src-github manifest
-firstpass-src-github doctor
-firstpass-src-github configure
-firstpass-src-github sync
-firstpass-src-github fetch
-firstpass-src-github validate-action
-firstpass-src-github preview-action
-firstpass-src-github execute-action
-firstpass-src-github prepare-automation-workspace
-firstpass-src-github submit-automation-workspace
-firstpass-src-github detect-automation-pr
+m87-src-github manifest
+m87-src-github doctor
+m87-src-github configure
+m87-src-github sync
+m87-src-github fetch
+m87-src-github validate-action
+m87-src-github preview-action
+m87-src-github execute-action
+m87-src-github prepare-automation-workspace
+m87-src-github submit-automation-workspace
+m87-src-github detect-automation-pr
 ```
 
-Plugin executable names must follow the `firstpass-src-xyz` convention.
+Plugin executable names must follow the `m87-src-xyz` convention.
 The core passes `--protocol-version` to each command.
 Plugins return the protocol version they actually used.
 
@@ -289,7 +289,7 @@ Protocol-required manifest fields:
 
 | Field              | Meaning                                                             |
 | ------------------ | ------------------------------------------------------------------- |
-| `protocol_version` | Protocol version such as `firstpass.plugin.v2`.                     |
+| `protocol_version` | Protocol version such as `m87.plugin.v2`.                           |
 | `plugin`           | `id`, `version`, optional `display_name`, and optional `publisher`. |
 
 Recommended manifest metadata fields:
@@ -373,7 +373,7 @@ Actions with `required: false` may fail without blocking handling, but their fai
 Prompt sections:
 
 - Core policy: act as the user's triage assistant, propose options, do not claim actions were taken, respect approval boundary.
-- User policy: local instructions from `~/.firstpass/AGENTS.md` or equivalent.
+- User policy: local instructions from `~/.m87/AGENTS.md` or equivalent.
 - Plugin policy: tone, ignore rules, escalation rules, and allowed actions.
 - Plugin source context: item metadata, thread text, related objects, and source-specific caveats.
 - Evidence catalog: stable IDs for events, snippets, attachments, URLs, and related objects that options can cite.
@@ -386,17 +386,17 @@ It asks the agent to ground rationale in visible source context and prefers no r
 ## Agent Runtime
 
 MVP uses ACP as the only agent integration boundary.
-`firstpass` depends on bundled `acpx/runtime`, accepts `agent: acp:<target-or-command>`, and does not implement native Claude, Codex, OpenCode, or Rovo Dev adapters in core.
+`m87` depends on bundled `acpx/runtime`, accepts `agent: acp:<target-or-command>`, and does not implement native Claude, Codex, OpenCode, or Rovo Dev adapters in core.
 Named ACP targets resolve through the bundled `acpx` registry plus user-configured `acp_registry_overrides`.
 Raw custom ACP server commands may be supplied after `acp:`.
 Raw command target redaction is applied only on surfaces that explicitly call the ACP target redactor; status output and state export can expose the configured command string, so custom ACP commands must not contain secrets.
 
-The daemon creates one persistent ACP session per logical firstpass worker and stores ACP session state under `~/.firstpass/acp-sessions` or a run-specific child directory.
+The daemon creates one persistent ACP session per logical m87 worker and stores ACP session state under `~/.m87/acp-sessions` or a run-specific child directory.
 Each triage run starts a turn with the assembled prompt plus the recommendation JSON Schema as the final output contract.
 The runtime streams assistant output, status events, and tool-call events to the daemon so the TUI can show progress without exposing noisy protocol mechanics.
 The daemon parses the final output text as JSON, validates it against the recommendation schema, and retries or surfaces an invalid-recommendation error when parsing fails.
 
-`firstpass` should follow this ACP posture:
+`m87` should follow this ACP posture:
 
 - Use `createAcpRuntime`, `createAgentRegistry`, and `createFileSessionStore` from `acpx/runtime`.
 - Use persistent ACP sessions keyed by stable run or worker IDs.
@@ -410,11 +410,11 @@ The daemon parses the final output text as JSON, validates it against the recomm
 
 Agent data leaves the machine when the configured ACP target sends it to a hosted model or remote service.
 The UI and documentation must say this plainly when configuring an ACP target.
-Local-first means `firstpass` does not require an `firstpass` hosted control plane; it does not mean every configured model runs locally.
+Local-first means `m87` does not require an `m87` hosted control plane; it does not mean every configured model runs locally.
 
 ## Local Tracking And Retriage
 
-`firstpass` uses local watermarks instead of source-side labels or tags.
+`m87` uses local watermarks instead of source-side labels or tags.
 This is the key architectural difference from GitHub-specific triage.
 
 For each item, the core stores latest observed `activity_at`, `activity_id`, `content_fingerprint`, latest recommendation watermark, latest approval watermark, local inbox state, snooze state, and matched ignore rules.
@@ -508,7 +508,7 @@ Plugins should avoid recommending multi-action options that require atomicity un
 
 Action safety levels:
 
-- `local_only`: changes only local `firstpass` state.
+- `local_only`: changes only local `m87` state.
 - `source_private`: changes private source state such as archive, read, label, or draft.
 - `external_write`: sends text or visible interaction to other people.
 - `destructive`: closes, deletes, blocks, merges, or otherwise changes durable shared state.
@@ -543,15 +543,15 @@ X should remain V1-only if API access is viable; support read-only mode if write
 
 ## Configuration And Discovery
 
-Global config lives at `~/.firstpass/config.yaml`.
+Global config lives at `~/.m87/config.yaml`.
 Plugin credentials should not be stored in core config unless unavoidable.
 Plugins should prefer OS keychain, existing CLIs, OAuth token stores, or their own encrypted files.
 
 The config contains `agent`, `poll_interval`, `acp_registry_overrides`, and `plugins`.
-The state directory comes from `FIRSTPASS_STATE_DIR` or defaults to `~/.firstpass`, and installed plugin config is stored with the plugin record.
+The state directory comes from `M87_STATE_DIR` or defaults to `~/.m87`, and installed plugin config is stored with the plugin record.
 
-MVP plugin installation is limited to bundled plugin IDs exposed by `firstpass plugin list`.
-Third-party discovery from explicit config paths, `~/.firstpass/plugins`, or `PATH` executables named `firstpass-src-*` is future work.
+MVP plugin installation is limited to bundled plugin IDs exposed by `m87 plugin list`.
+Third-party discovery from explicit config paths, `~/.m87/plugins`, or `PATH` executables named `m87-src-*` is future work.
 
 The plugin command should be stable enough for third-party plugins in any language.
 Bundling does not imply provenance or safety.
@@ -591,7 +591,7 @@ Retention defaults should support useful product behavior without hoarding sourc
 
 SQLite encryption is not required for MVP by default.
 Adding it usually means choosing and shipping SQLCipher or an equivalent encrypted SQLite build, managing passphrases or OS keychain integration, handling migrations and backups differently, and debugging more platform-specific installation failures.
-The MVP should document that local data is stored in the user's filesystem under `~/.firstpass`, recommend full-disk encryption for sensitive machines, and leave database encryption as a later opt-in feature unless Gmail or enterprise use makes it a hard requirement.
+The MVP should document that local data is stored in the user's filesystem under `~/.m87`, recommend full-disk encryption for sensitive machines, and leave database encryption as a later opt-in feature unless Gmail or enterprise use makes it a hard requirement.
 
 Backup and portability should start with local export/import, not hosted backup.
 V1 should provide an explicit export of local state, installed plugin identities, and redacted core configuration.
@@ -673,22 +673,22 @@ Completed items should be checked off in this document as implementation PRs mer
 Phase 0: Project skeleton and protocol proof
 
 - [x] Create the Node ESM JavaScript package with Commander, `tsc --noEmit`, Vitest, linting, formatting, and build scripts.
-- [x] Add config loading for `~/.firstpass/config.yaml`, state directory creation, and snake_case config validation.
+- [x] Add config loading for `~/.m87/config.yaml`, state directory creation, and snake_case config validation.
 - [x] Add the SQLite connection, migration runner, and initial schema for plugins, configured plugins, items, events, and fingerprints.
 - [x] Define runtime validators for plugin manifests, sync responses, fetch responses, recommendations, and action results.
 - [x] Build the mock source plugin executable with manifest, configure, sync, fetch, validate-action, preview-action, execute-action, automation-workspace, and PR-detection commands.
 - [x] Add e2e harness utilities for temporary state directories, mocked source plugins, mocked ACP targets, and built CLI execution.
-- [x] Implement `firstpass init`, `firstpass status`, `firstpass plugin list`, and `firstpass plugin list` against real local state.
+- [x] Implement `m87 init`, `m87 status`, `m87 plugin list`, and `m87 plugin list` against real local state.
 - [x] Implement one e2e test that syncs mock plugin items into SQLite through the real CLI.
 
 Phase 1: Core inbox loop
 
 - [x] Implement bundled plugin listing and immediate installation for known plugin IDs.
 - [x] Implement manifest validation, manifest metadata persistence, and immediate installation for configured plugins.
-- [x] Implement `firstpass plugin configure` and `firstpass plugin doctor` for the mock plugin.
+- [x] Implement `m87 plugin configure` and `m87 plugin doctor` for the mock plugin.
 - [x] Implement the daemon sync loop with fingerprint persistence, pagination, rate-limit, permission-denied, error, deletion, and partial-response handling.
 - [x] Implement item eligibility, local watermarks, simple attention policy, deterministic sorting, and item state transitions.
-- [x] Implement `firstpass list` and `firstpass view <item-id>` with compact structured output and definitive empty states.
+- [x] Implement `m87 list` and `m87 view <item-id>` with compact structured output and definitive empty states.
 - [x] Implement ACP recommendation generation through `acpx/runtime` using a mocked ACP target in e2e tests.
 - [x] Implement recommendation validation, evidence validation, action payload validation, invalid-output handling, and usage estimation fallback.
 - [x] Implement rerun triage with private user instructions and persisted agent run records.
@@ -738,5 +738,5 @@ Phase 6: Polish and release readiness
 - [x] Add daemon status with agent target/source, plugin sync health, item counts, queue counts, and event count.
 - [x] Harden CLI structured output, errors, no-op mutation behavior, truncation, and contextual help for agent use.
 - [x] Improve TUI visual polish, empty states, loading states, error states, and screenshot-ready demo fixtures.
-- [x] Add package publishing checks for `npm install -g firstpass` on supported Node and OS targets.
+- [x] Add package publishing checks for `npm install -g m87` on supported Node and OS targets.
 - [x] Add release documentation covering install, setup, plugin trust, credentials, retention, ACP targets, and first GitHub workflow.

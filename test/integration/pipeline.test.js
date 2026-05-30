@@ -10,12 +10,12 @@ import { deadLetterCount, enqueue } from "../../src/core/queue.js";
 import { readManifest } from "../../src/host/plugin.js";
 import { createEffects } from "../../src/host/effects.js";
 import {
-  createFirstpassTestWorkspace,
+  createM87TestWorkspace,
   createMockAcpTarget,
 } from "../support/e2e-harness.js";
 
 const MOCK = fileURLToPath(
-  new URL("../../plugins/mock/firstpass-src-mock.js", import.meta.url),
+  new URL("../../plugins/mock/m87-src-mock.js", import.meta.url),
 );
 const ITEM = itemId("mock", "issue-1");
 
@@ -59,12 +59,12 @@ describe("integration: full pipeline with real mock plugin + acp-mock", () => {
   let db;
 
   beforeEach(async () => {
-    ws = await createFirstpassTestWorkspace();
-    db = createDatabase(`${ws.stateDir}/firstpass.sqlite`);
+    ws = await createM87TestWorkspace();
+    db = createDatabase(`${ws.stateDir}/m87.sqlite`);
     const manifest = await readManifest(MOCK);
     db.prepare(
       `insert into plugins (id, binary_path, version, protocol_version, manifest_json, config_json, status, installed_at)
-       values ('mock', ?, '2.0.0', 'firstpass.plugin.v2', ?, '{}', 'active', 't')`,
+       values ('mock', ?, '2.0.0', 'm87.plugin.v2', ?, '{}', 'active', 't')`,
     ).run(MOCK, JSON.stringify(manifest));
   });
 

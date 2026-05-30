@@ -65,7 +65,7 @@ describe("tui/buildInboxModel", () => {
   let dir;
   let db;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-model-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-model-"));
     db = createDatabase(join(dir, "t.sqlite"));
     db.prepare(
       `insert into plugins (id, binary_path, version, protocol_version, manifest_json, installed_at) values ('mock','/b','1','v1','{}','t')`,
@@ -145,14 +145,14 @@ describe("tui/buildInboxModel", () => {
       { waiting_on: "user" },
       {
         item_type: "pull_request",
-        metadata: { display_handle: "kunchenguid/firstpass · PR #221" },
+        metadata: { display_handle: "kunchenguid/m87 · PR #221" },
       },
     );
     recommend(db, [{ title: "Merge", confidence: "high", actions: [] }]);
     const meta = buildInboxModel(db, { selectedIndex: 0 }).items[0].meta;
-    expect(meta.handle).toBe("kunchenguid/firstpass · PR #221");
+    expect(meta.handle).toBe("kunchenguid/m87 · PR #221");
     expect(meta.age).toBe("2h");
-    expect(meta.text).toContain("kunchenguid/firstpass · PR #221");
+    expect(meta.text).toContain("kunchenguid/m87 · PR #221");
     expect(meta.text).toContain("2h");
     // the inbox is your queue by default, so "waiting on you" is not repeated per row
     expect(meta.waiting).toBeNull();

@@ -7,7 +7,7 @@ import { describe, expect, test } from "vitest";
 
 const execFileAsync = promisify(execFile);
 
-const PLUGIN_PATH = "plugins/github/firstpass-src-github.js";
+const PLUGIN_PATH = "plugins/github/m87-src-github.js";
 
 /**
  * Spawn the plugin as a subprocess, write JSON to stdin, capture stdout.
@@ -47,12 +47,12 @@ const runPluginWithInput = (args, input, env = process.env) =>
 
 /**
  * Write a fake `gh` executable that responds to the args the plugin passes.
- * Reuses the PATH-injection approach (FIRSTPASS_GH_BIN) from the legacy test.
+ * Reuses the PATH-injection approach (M87_GH_BIN) from the legacy test.
  *
  * @param {string[]} scriptLines
  */
 async function writeFakeGh(scriptLines) {
-  const tempDir = await mkdtemp(join(tmpdir(), "firstpass-gh-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "m87-gh-"));
   // .mjs so the plugin runs it under Node on every platform (Windows can't exec
   // a bare shebang script); the script body below is ESM.
   const fakeGhPath = join(tempDir, "gh.mjs");
@@ -85,21 +85,21 @@ async function readGhCalls(callsPath) {
 }
 
 /**
- * A fake gh that serves one open issue and one open PR for kunchenguid/firstpass.
+ * A fake gh that serves one open issue and one open PR for kunchenguid/m87.
  * `issueOverride` / `prOverride` let a test drop or change an object.
  *
  * @param {{ issues?: string, prs?: string }} [overrides]
  */
-function ghScriptForFirstpassRepo(overrides = {}) {
+function ghScriptForM87Repo(overrides = {}) {
   const issues =
     overrides.issues ??
     JSON.stringify([
       {
         number: 42,
-        title: "FirstPass issue",
+        title: "M87 issue",
         author: { login: "octocat" },
         state: "OPEN",
-        url: "https://github.com/kunchenguid/firstpass/issues/42",
+        url: "https://github.com/kunchenguid/m87/issues/42",
         updatedAt: "2026-05-15T10:00:00Z",
         labels: [{ name: "needs-response" }],
         comments: 3,
@@ -110,10 +110,10 @@ function ghScriptForFirstpassRepo(overrides = {}) {
     JSON.stringify([
       {
         number: 7,
-        title: "FirstPass PR",
+        title: "M87 PR",
         author: { login: "reviewer" },
         state: "OPEN",
-        url: "https://github.com/kunchenguid/firstpass/pull/7",
+        url: "https://github.com/kunchenguid/m87/pull/7",
         updatedAt: "2026-05-15T11:00:00Z",
         labels: [],
         reviewDecision: "CHANGES_REQUESTED",
@@ -138,7 +138,7 @@ const syncInput = (fingerprints) =>
     fingerprints,
     config: {
       username: "kunchenguid",
-      explicit_repos: ["kunchenguid/firstpass"],
+      explicit_repos: ["kunchenguid/m87"],
     },
   })}\n`;
 
@@ -150,7 +150,7 @@ describe("github source plugin (contract v2)", () => {
     ]);
     const manifest = JSON.parse(stdout);
 
-    expect(manifest.protocol_version).toBe("firstpass.plugin.v2");
+    expect(manifest.protocol_version).toBe("m87.plugin.v2");
     expect(manifest.plugin.id).toBe("github");
     expect(manifest.item_types.map((t) => t.type)).toEqual([
       "issue",
@@ -170,21 +170,21 @@ describe("github source plugin (contract v2)", () => {
       PLUGIN_PATH,
       "manifest",
       "--protocol-version",
-      "firstpass.plugin.v2",
+      "m87.plugin.v2",
     ]);
-    expect(JSON.parse(stdout).protocol_version).toBe("firstpass.plugin.v2");
+    expect(JSON.parse(stdout).protocol_version).toBe("m87.plugin.v2");
   });
 
   test("sync with empty fingerprints emits created events and a baseline", async () => {
-    const { fakeGhPath } = await writeFakeGh(ghScriptForFirstpassRepo());
+    const { fakeGhPath } = await writeFakeGh(ghScriptForM87Repo());
 
     const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
 
-    expect(result.protocol_version).toBe("firstpass.plugin.v2");
+    expect(result.protocol_version).toBe("m87.plugin.v2");
     expect(result.status).toBe("complete");
 
     // No items[] in v2 - only events.
@@ -193,8 +193,8 @@ describe("github source plugin (contract v2)", () => {
     const lifecycles = result.events.map((e) => e.lifecycle);
     expect(lifecycles).toEqual(["created", "created"]);
     expect(result.events.map((e) => e.external_id).sort()).toEqual([
-      "github:issue:kunchenguid/firstpass/42",
-      "github:pr:kunchenguid/firstpass/7",
+      "github:issue:kunchenguid/m87/42",
+      "github:pr:kunchenguid/m87/7",
     ]);
     for (const event of result.events) {
       expect(event.entity).toBe("item");
@@ -205,14 +205,14 @@ describe("github source plugin (contract v2)", () => {
 
     // The returned baseline maps every external_id to its fingerprint.
     expect(Object.keys(result.fingerprints).sort()).toEqual([
-      "github:issue:kunchenguid/firstpass/42",
-      "github:pr:kunchenguid/firstpass/7",
+      "github:issue:kunchenguid/m87/42",
+      "github:pr:kunchenguid/m87/7",
     ]);
   });
 
   test("re-syncing with the returned baseline emits no events (pure diff)", async () => {
-    const { fakeGhPath } = await writeFakeGh(ghScriptForFirstpassRepo());
-    const env = { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath };
+    const { fakeGhPath } = await writeFakeGh(ghScriptForM87Repo());
+    const env = { ...process.env, M87_GH_BIN: fakeGhPath };
 
     const first = JSON.parse(
       (await runPluginWithInput(["sync"], syncInput({}), env)).stdout,
@@ -229,8 +229,8 @@ describe("github source plugin (contract v2)", () => {
   });
 
   test("a removed object emits a closed event", async () => {
-    const { fakeGhPath } = await writeFakeGh(ghScriptForFirstpassRepo());
-    const env = { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath };
+    const { fakeGhPath } = await writeFakeGh(ghScriptForM87Repo());
+    const env = { ...process.env, M87_GH_BIN: fakeGhPath };
 
     const first = JSON.parse(
       (await runPluginWithInput(["sync"], syncInput({}), env)).stdout,
@@ -238,9 +238,9 @@ describe("github source plugin (contract v2)", () => {
 
     // Now the PR has disappeared from the live source; only the issue remains.
     const { fakeGhPath: shrunkGh } = await writeFakeGh(
-      ghScriptForFirstpassRepo({ prs: "[]" }),
+      ghScriptForM87Repo({ prs: "[]" }),
     );
-    const shrunkEnv = { ...process.env, FIRSTPASS_GH_BIN: shrunkGh };
+    const shrunkEnv = { ...process.env, M87_GH_BIN: shrunkGh };
 
     const second = JSON.parse(
       (
@@ -254,34 +254,34 @@ describe("github source plugin (contract v2)", () => {
 
     const closed = second.events.filter((e) => e.lifecycle === "closed");
     expect(closed.map((e) => e.external_id)).toEqual([
-      "github:pr:kunchenguid/firstpass/7",
+      "github:pr:kunchenguid/m87/7",
     ]);
     expect(closed[0].state).toBe("closed");
 
     // The issue is unchanged, so no event for it; baseline drops the PR.
     expect(second.events.every((e) => e.lifecycle === "closed")).toBe(true);
     expect(Object.keys(second.fingerprints)).toEqual([
-      "github:issue:kunchenguid/firstpass/42",
+      "github:issue:kunchenguid/m87/42",
     ]);
   });
 
   test("a changed fingerprint emits an updated event with local_state new", async () => {
-    const { fakeGhPath } = await writeFakeGh(ghScriptForFirstpassRepo());
-    const env = { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath };
+    const { fakeGhPath } = await writeFakeGh(ghScriptForM87Repo());
+    const env = { ...process.env, M87_GH_BIN: fakeGhPath };
     const first = JSON.parse(
       (await runPluginWithInput(["sync"], syncInput({}), env)).stdout,
     );
 
     // The issue gained activity (new updatedAt / comment count).
     const { fakeGhPath: movedGh } = await writeFakeGh(
-      ghScriptForFirstpassRepo({
+      ghScriptForM87Repo({
         issues: JSON.stringify([
           {
             number: 42,
-            title: "FirstPass issue",
+            title: "M87 issue",
             author: { login: "octocat" },
             state: "OPEN",
-            url: "https://github.com/kunchenguid/firstpass/issues/42",
+            url: "https://github.com/kunchenguid/m87/issues/42",
             updatedAt: "2026-05-16T10:00:00Z",
             labels: [{ name: "needs-response" }],
             comments: 5,
@@ -289,7 +289,7 @@ describe("github source plugin (contract v2)", () => {
         ]),
       }),
     );
-    const movedEnv = { ...process.env, FIRSTPASS_GH_BIN: movedGh };
+    const movedEnv = { ...process.env, M87_GH_BIN: movedGh };
 
     const second = JSON.parse(
       (
@@ -303,7 +303,7 @@ describe("github source plugin (contract v2)", () => {
 
     const updated = second.events.filter((e) => e.lifecycle === "updated");
     expect(updated.map((e) => e.external_id)).toEqual([
-      "github:issue:kunchenguid/firstpass/42",
+      "github:issue:kunchenguid/m87/42",
     ]);
     expect(updated[0].payload.local_state).toBe("new");
   });
@@ -319,10 +319,10 @@ describe("github source plugin (contract v2)", () => {
         JSON.stringify([
           {
             number: 42,
-            title: "FirstPass issue",
+            title: "M87 issue",
             author: { login: "octocat" },
             state: "OPEN",
-            url: "https://github.com/kunchenguid/firstpass/issues/42",
+            url: "https://github.com/kunchenguid/m87/issues/42",
             updatedAt: "2026-05-20T10:00:00Z",
             labels: [],
             comments: 9,
@@ -351,7 +351,7 @@ describe("github source plugin (contract v2)", () => {
       fingerprints,
       config: {
         username: "kunchenguid",
-        explicit_repos: ["kunchenguid/firstpass"],
+        explicit_repos: ["kunchenguid/m87"],
         activity_probe: true,
         activity_probe_interval: 0,
       },
@@ -370,7 +370,7 @@ describe("github source plugin (contract v2)", () => {
       (
         await runPluginWithInput(["sync"], probeSyncInput({}), {
           ...process.env,
-          FIRSTPASS_GH_BIN: gh1,
+          M87_GH_BIN: gh1,
         })
       ).stdout,
     );
@@ -394,7 +394,7 @@ describe("github source plugin (contract v2)", () => {
       (
         await runPluginWithInput(["sync"], probeSyncInput(first.fingerprints), {
           ...process.env,
-          FIRSTPASS_GH_BIN: gh2,
+          M87_GH_BIN: gh2,
         })
       ).stdout,
     );
@@ -414,7 +414,7 @@ describe("github source plugin (contract v2)", () => {
       (
         await runPluginWithInput(["sync"], probeSyncInput({}), {
           ...process.env,
-          FIRSTPASS_GH_BIN: gh1,
+          M87_GH_BIN: gh1,
         })
       ).stdout,
     );
@@ -435,7 +435,7 @@ describe("github source plugin (contract v2)", () => {
       (
         await runPluginWithInput(["sync"], probeSyncInput(first.fingerprints), {
           ...process.env,
-          FIRSTPASS_GH_BIN: gh2,
+          M87_GH_BIN: gh2,
         })
       ).stdout,
     );
@@ -455,7 +455,7 @@ describe("github source plugin (contract v2)", () => {
             title: "My own issue",
             author: { login: "kunchenguid" },
             state: "OPEN",
-            url: "https://github.com/kunchenguid/firstpass/issues/50",
+            url: "https://github.com/kunchenguid/m87/issues/50",
             updatedAt: "2026-05-20T10:00:00Z",
             labels: [],
             comments: issueComments.length,
@@ -482,7 +482,7 @@ describe("github source plugin (contract v2)", () => {
       (
         await runPluginWithInput(["sync"], probeSyncInput({}), {
           ...process.env,
-          FIRSTPASS_GH_BIN: fakeGhPath,
+          M87_GH_BIN: fakeGhPath,
         })
       ).stdout,
     );
@@ -509,7 +509,7 @@ describe("github source plugin (contract v2)", () => {
       (
         await runPluginWithInput(["sync"], probeSyncInput({}), {
           ...process.env,
-          FIRSTPASS_GH_BIN: fakeGhPath,
+          M87_GH_BIN: fakeGhPath,
         })
       ).stdout,
     );
@@ -584,11 +584,11 @@ describe("github source plugin (contract v2)", () => {
       'if (args[0] === "issue" && args[1] === "list") { process.stderr.write("API rate limit exceeded"); process.exit(1); }',
       'if (args[0] === "pr" && args[1] === "list") { process.stdout.write("[]"); process.exit(0); }',
     ]);
-    const baseline = { "github:issue:kunchenguid/firstpass/42": "abc" };
+    const baseline = { "github:issue:kunchenguid/m87/42": "abc" };
 
     const { stdout } = await runPluginWithInput(["sync"], syncInput(baseline), {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
 
@@ -652,7 +652,7 @@ describe("github source plugin (contract v2)", () => {
     const { stdout } = await runPluginWithInput(
       ["sync"],
       conditionSyncInput(["all_public_owned"]),
-      { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath },
+      { ...process.env, M87_GH_BIN: fakeGhPath },
     );
     const result = JSON.parse(stdout);
     const repos = result.events
@@ -682,7 +682,7 @@ describe("github source plugin (contract v2)", () => {
     const { stdout } = await runPluginWithInput(
       ["sync"],
       conditionSyncInput(["all_public_owned_and_starred"]),
-      { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath },
+      { ...process.env, M87_GH_BIN: fakeGhPath },
     );
     const result = JSON.parse(stdout);
     const ids = result.events
@@ -758,7 +758,7 @@ describe("github source plugin (contract v2)", () => {
       fingerprints: {},
       config: {
         username: "kunchenguid",
-        explicit_repos: ["kunchenguid/firstpass"],
+        explicit_repos: ["kunchenguid/m87"],
         exclude_drafts: true,
         exclude_wip: true,
       },
@@ -766,14 +766,14 @@ describe("github source plugin (contract v2)", () => {
 
     const { stdout } = await runPluginWithInput(["sync"], input, {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const ids = JSON.parse(stdout)
       .events.map((e) => e.external_id)
       .sort();
     expect(ids).toEqual([
-      "github:issue:kunchenguid/firstpass/43",
-      "github:pr:kunchenguid/firstpass/8",
+      "github:issue:kunchenguid/m87/43",
+      "github:pr:kunchenguid/m87/8",
     ]);
   });
 
@@ -797,16 +797,16 @@ describe("github source plugin (contract v2)", () => {
       fingerprints: {},
       config: {
         username: "kunchenguid",
-        explicit_repos: ["kunchenguid/firstpass"],
+        explicit_repos: ["kunchenguid/m87"],
         ignore_older_than: "365d",
       },
     })}\n`;
     const { stdout } = await runPluginWithInput(["sync"], input, {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const ids = JSON.parse(stdout).events.map((e) => e.external_id);
-    expect(ids).toEqual(["github:issue:kunchenguid/firstpass/2"]);
+    expect(ids).toEqual(["github:issue:kunchenguid/m87/2"]);
   });
 
   // FU-11: stale_threshold marks long-idle open items with a local stale flag.
@@ -829,13 +829,13 @@ describe("github source plugin (contract v2)", () => {
       fingerprints: {},
       config: {
         username: "kunchenguid",
-        explicit_repos: ["kunchenguid/firstpass"],
+        explicit_repos: ["kunchenguid/m87"],
         stale_threshold: "30d",
       },
     })}\n`;
     const { stdout } = await runPluginWithInput(["sync"], input, {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const events = JSON.parse(stdout).events;
     const idle = events.find((e) => e.external_id.endsWith("/1"));
@@ -852,7 +852,7 @@ describe("github source plugin (contract v2)", () => {
     ]);
     const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
     expect(result.status).toBe("rate_limited");
@@ -867,7 +867,7 @@ describe("github source plugin (contract v2)", () => {
     ]);
     const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
     expect(result.status).toBe("rate_limited");
@@ -877,7 +877,7 @@ describe("github source plugin (contract v2)", () => {
   test("reports missing gh as permission_denied", async () => {
     const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
       ...process.env,
-      FIRSTPASS_GH_BIN: "/missing/gh",
+      M87_GH_BIN: "/missing/gh",
     });
     const result = JSON.parse(stdout);
 
@@ -891,7 +891,7 @@ describe("github source plugin (contract v2)", () => {
         await runPluginWithInput(
           ["validate-action"],
           `${JSON.stringify({
-            item_external_id: "github:pr:kunchenguid/firstpass/7",
+            item_external_id: "github:pr:kunchenguid/m87/7",
             action: {
               id: "r1",
               action_type: "review",
@@ -906,24 +906,24 @@ describe("github source plugin (contract v2)", () => {
         await runPluginWithInput(
           ["validate-action"],
           `${JSON.stringify({
-            item_external_id: "github:issue:kunchenguid/firstpass/42",
+            item_external_id: "github:issue:kunchenguid/m87/42",
             action: { id: "c1", action_type: "close", params: {} },
           })}\n`,
         )
       ).stdout,
     );
 
-    expect(review.protocol_version).toBe("firstpass.plugin.v2");
+    expect(review.protocol_version).toBe("m87.plugin.v2");
     expect(review).toMatchObject({ valid: true, safety: "external_write" });
     expect(close).toMatchObject({ valid: true, safety: "destructive" });
   });
 
   test("sync stamps maintainer role + viewer identity on configured-repo items", async () => {
-    const { fakeGhPath } = await writeFakeGh(ghScriptForFirstpassRepo());
+    const { fakeGhPath } = await writeFakeGh(ghScriptForM87Repo());
 
     const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
 
@@ -940,11 +940,11 @@ describe("github source plugin (contract v2)", () => {
   });
 
   test("sync stamps a display_handle of repo + ref on items", async () => {
-    const { fakeGhPath } = await writeFakeGh(ghScriptForFirstpassRepo());
+    const { fakeGhPath } = await writeFakeGh(ghScriptForM87Repo());
 
     const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
 
@@ -953,21 +953,21 @@ describe("github source plugin (contract v2)", () => {
       // The plugin owns its source label; core just renders the string. It
       // names the repo and the ref so the inbox is scannable by repo.
       expect(event.metadata.display_handle).toMatch(
-        /^kunchenguid\/firstpass · (PR|issue) #\d+$/,
+        /^kunchenguid\/m87 · (PR|issue) #\d+$/,
       );
     }
   });
 
   test("sync marks a self-authored PR as is_self_authored", async () => {
     const { fakeGhPath } = await writeFakeGh(
-      ghScriptForFirstpassRepo({
+      ghScriptForM87Repo({
         prs: JSON.stringify([
           {
             number: 9,
             title: "My own PR",
             author: { login: "kunchenguid" },
             state: "OPEN",
-            url: "https://github.com/kunchenguid/firstpass/pull/9",
+            url: "https://github.com/kunchenguid/m87/pull/9",
             updatedAt: "2026-05-15T11:00:00Z",
             labels: [],
             reviewDecision: "",
@@ -978,7 +978,7 @@ describe("github source plugin (contract v2)", () => {
 
     const { stdout } = await runPluginWithInput(["sync"], syncInput({}), {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
     const pr = result.events.find((e) =>
@@ -1018,14 +1018,14 @@ describe("github source plugin (contract v2)", () => {
       fingerprints: {},
       config: {
         username: "kunchenguid",
-        explicit_repos: ["kunchenguid/firstpass"],
+        explicit_repos: ["kunchenguid/m87"],
         authored_external: true,
       },
     })}\n`;
 
     const { stdout } = await runPluginWithInput(["sync"], input, {
       ...process.env,
-      FIRSTPASS_GH_BIN: fakeGhPath,
+      M87_GH_BIN: fakeGhPath,
     });
     const result = JSON.parse(stdout);
     const contrib = result.events.find((e) =>
@@ -1054,7 +1054,7 @@ describe("github source plugin (contract v2)", () => {
         await runPluginWithInput(
           ["validate-action"],
           `${JSON.stringify({
-            item_external_id: "github:pr:kunchenguid/firstpass/7",
+            item_external_id: "github:pr:kunchenguid/m87/7",
             action: {
               id: "m1",
               action_type: "merge",
@@ -1071,7 +1071,7 @@ describe("github source plugin (contract v2)", () => {
         await runPluginWithInput(
           ["validate-action"],
           `${JSON.stringify({
-            item_external_id: "github:issue:kunchenguid/firstpass/42",
+            item_external_id: "github:issue:kunchenguid/m87/42",
             action: { id: "m1", action_type: "merge", params: {} },
           })}\n`,
         )
@@ -1088,7 +1088,7 @@ describe("github source plugin (contract v2)", () => {
     const { stdout } = await runPluginWithInput(
       ["execute-action"],
       `${JSON.stringify({
-        item_external_id: "github:pr:kunchenguid/firstpass/7",
+        item_external_id: "github:pr:kunchenguid/m87/7",
         approval_id: "approval-7",
         action: {
           id: "m1",
@@ -1096,7 +1096,7 @@ describe("github source plugin (contract v2)", () => {
           params: { method: "squash" },
         },
       })}\n`,
-      { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath },
+      { ...process.env, M87_GH_BIN: fakeGhPath },
     );
     expect(JSON.parse(stdout).status).toBe("succeeded");
     expect(await readGhCalls(callsPath)).toContainEqual([
@@ -1104,7 +1104,7 @@ describe("github source plugin (contract v2)", () => {
       "merge",
       "7",
       "--repo",
-      "kunchenguid/firstpass",
+      "kunchenguid/m87",
       "--squash",
     ]);
   });
@@ -1119,7 +1119,7 @@ describe("github source plugin (contract v2)", () => {
     const { stdout } = await runPluginWithInput(
       ["execute-action"],
       `${JSON.stringify({
-        item_external_id: "github:pr:kunchenguid/firstpass/7",
+        item_external_id: "github:pr:kunchenguid/m87/7",
         approval_id: "approval-7",
         action: {
           id: "m1",
@@ -1127,7 +1127,7 @@ describe("github source plugin (contract v2)", () => {
           params: { method: "rebase" },
         },
       })}\n`,
-      { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath },
+      { ...process.env, M87_GH_BIN: fakeGhPath },
     );
     const result = JSON.parse(stdout);
     expect(result.status).toBe("succeeded");
@@ -1139,19 +1139,15 @@ describe("github source plugin (contract v2)", () => {
 
   // FU-13: configurable fix PR-create modes.
   async function writeWorkspaceWithChange() {
-    const ws = await mkdtemp(join(tmpdir(), "firstpass-fix-ws-"));
+    const ws = await mkdtemp(join(tmpdir(), "m87-fix-ws-"));
     await execFileAsync("git", ["init", "-q"], { cwd: ws });
     await execFileAsync("git", ["config", "user.email", "t@t.dev"], {
       cwd: ws,
     });
     await execFileAsync("git", ["config", "user.name", "t"], { cwd: ws });
-    await execFileAsync(
-      "git",
-      ["checkout", "-q", "-b", "firstpass/fix-job-1"],
-      {
-        cwd: ws,
-      },
-    );
+    await execFileAsync("git", ["checkout", "-q", "-b", "m87/fix-job-1"], {
+      cwd: ws,
+    });
     await writeFile(join(ws, "change.txt"), "edited");
     return ws;
   }
@@ -1162,7 +1158,7 @@ describe("github source plugin (contract v2)", () => {
       'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',
     ]);
     // Fake the remote push by pointing origin at a bare repo.
-    const bare = await mkdtemp(join(tmpdir(), "firstpass-fix-remote-"));
+    const bare = await mkdtemp(join(tmpdir(), "m87-fix-remote-"));
     await execFileAsync("git", ["init", "-q", "--bare"], { cwd: bare });
     await execFileAsync("git", ["remote", "add", "origin", bare], { cwd: ws });
 
@@ -1171,13 +1167,13 @@ describe("github source plugin (contract v2)", () => {
       `${JSON.stringify({
         job: {
           id: "job-1",
-          item_external_id: "github:pr:kunchenguid/firstpass/7",
+          item_external_id: "github:pr:kunchenguid/m87/7",
           role: "maintainer",
         },
         workspace_path: ws,
         config: { fix_pr_create: "disabled" },
       })}\n`,
-      { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath },
+      { ...process.env, M87_GH_BIN: fakeGhPath },
     );
     const result = JSON.parse(stdout);
     expect(result.status).toBe("submitted");
@@ -1186,31 +1182,29 @@ describe("github source plugin (contract v2)", () => {
 
   test("submit with fix_pr_create=gh opens a draft PR", async () => {
     const ws = await writeWorkspaceWithChange();
-    const bare = await mkdtemp(join(tmpdir(), "firstpass-fix-remote-"));
+    const bare = await mkdtemp(join(tmpdir(), "m87-fix-remote-"));
     await execFileAsync("git", ["init", "-q", "--bare"], { cwd: bare });
     await execFileAsync("git", ["remote", "add", "origin", bare], { cwd: ws });
     const { fakeGhPath, callsPath } = await writeFakeGh([
       'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',
-      'if (args[0] === "pr" && args[1] === "create") { process.stdout.write("https://github.com/kunchenguid/firstpass/pull/99"); process.exit(0); }',
+      'if (args[0] === "pr" && args[1] === "create") { process.stdout.write("https://github.com/kunchenguid/m87/pull/99"); process.exit(0); }',
     ]);
     const { stdout } = await runPluginWithInput(
       ["submit-automation-workspace"],
       `${JSON.stringify({
         job: {
           id: "job-1",
-          item_external_id: "github:pr:kunchenguid/firstpass/7",
+          item_external_id: "github:pr:kunchenguid/m87/7",
           role: "maintainer",
         },
         workspace_path: ws,
         config: { fix_pr_create: "gh" },
       })}\n`,
-      { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath },
+      { ...process.env, M87_GH_BIN: fakeGhPath },
     );
     const result = JSON.parse(stdout);
     expect(result.status).toBe("submitted");
-    expect(result.pr_url).toBe(
-      "https://github.com/kunchenguid/firstpass/pull/99",
-    );
+    expect(result.pr_url).toBe("https://github.com/kunchenguid/m87/pull/99");
     const calls = await readGhCalls(callsPath);
     expect(
       calls.some(
@@ -1229,8 +1223,8 @@ describe("github source plugin (contract v2)", () => {
       (
         await runPluginWithInput(
           ["detect-automation-pr"],
-          `${JSON.stringify({ repository: "kunchenguid/firstpass", branch: "firstpass/fix-job-1" })}\n`,
-          { ...process.env, FIRSTPASS_GH_BIN: missGh },
+          `${JSON.stringify({ repository: "kunchenguid/m87", branch: "m87/fix-job-1" })}\n`,
+          { ...process.env, M87_GH_BIN: missGh },
         )
       ).stdout,
     );
@@ -1238,31 +1232,31 @@ describe("github source plugin (contract v2)", () => {
 
     const { fakeGhPath: hitGh } = await writeFakeGh([
       'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',
-      'if (args[0] === "pr" && args[1] === "list") { process.stdout.write(JSON.stringify([{ url: "https://github.com/kunchenguid/firstpass/pull/77" }])); process.exit(0); }',
+      'if (args[0] === "pr" && args[1] === "list") { process.stdout.write(JSON.stringify([{ url: "https://github.com/kunchenguid/m87/pull/77" }])); process.exit(0); }',
     ]);
     const hit = JSON.parse(
       (
         await runPluginWithInput(
           ["detect-automation-pr"],
-          `${JSON.stringify({ repository: "kunchenguid/firstpass", branch: "firstpass/fix-job-1" })}\n`,
-          { ...process.env, FIRSTPASS_GH_BIN: hitGh },
+          `${JSON.stringify({ repository: "kunchenguid/m87", branch: "m87/fix-job-1" })}\n`,
+          { ...process.env, M87_GH_BIN: hitGh },
         )
       ).stdout,
     );
     expect(hit.status).toBe("submitted");
-    expect(hit.pr_url).toBe("https://github.com/kunchenguid/firstpass/pull/77");
+    expect(hit.pr_url).toBe("https://github.com/kunchenguid/m87/pull/77");
   });
 
   test("execute-action posts an approved comment through gh", async () => {
     const { fakeGhPath, callsPath } = await writeFakeGh([
       'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',
-      'if (args[0] === "issue" && args[1] === "comment") { process.stdout.write("https://github.com/kunchenguid/firstpass/issues/42#issuecomment-1"); process.exit(0); }',
+      'if (args[0] === "issue" && args[1] === "comment") { process.stdout.write("https://github.com/kunchenguid/m87/issues/42#issuecomment-1"); process.exit(0); }',
     ]);
 
     const { stdout } = await runPluginWithInput(
       ["execute-action"],
       `${JSON.stringify({
-        item_external_id: "github:issue:kunchenguid/firstpass/42",
+        item_external_id: "github:issue:kunchenguid/m87/42",
         approval_id: "approval-1",
         idempotency_key: "approval-1:c1",
         action: {
@@ -1271,18 +1265,18 @@ describe("github source plugin (contract v2)", () => {
           params: { body: "Thanks." },
         },
       })}\n`,
-      { ...process.env, FIRSTPASS_GH_BIN: fakeGhPath },
+      { ...process.env, M87_GH_BIN: fakeGhPath },
     );
     const result = JSON.parse(stdout);
 
-    expect(result.protocol_version).toBe("firstpass.plugin.v2");
+    expect(result.protocol_version).toBe("m87.plugin.v2");
     expect(result.status).toBe("succeeded");
     expect(await readGhCalls(callsPath)).toContainEqual([
       "issue",
       "comment",
       "42",
       "--repo",
-      "kunchenguid/firstpass",
+      "kunchenguid/m87",
       "--body",
       "Thanks.",
     ]);

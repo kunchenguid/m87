@@ -11,8 +11,8 @@ describe("core/database", () => {
   let db;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-db-"));
-    db = createDatabase(join(dir, "firstpass.sqlite"));
+    dir = mkdtempSync(join(tmpdir(), "m87-db-"));
+    db = createDatabase(join(dir, "m87.sqlite"));
   });
 
   afterEach(() => {

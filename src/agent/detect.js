@@ -11,7 +11,7 @@ const AUTODETECT_ORDER = [
 ];
 
 export function getAgentProbePath() {
-  const override = process.env.FIRSTPASS_AGENT_PROBE_PATH;
+  const override = process.env.M87_AGENT_PROBE_PATH;
   if (typeof override === "string") {
     return override;
   }

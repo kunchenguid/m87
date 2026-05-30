@@ -15,7 +15,7 @@ describe("setup/InitWizardView", () => {
     const model = buildInitWizardModel(
       { ...defaultInitSelections(), currentStep: "agent" },
       {
-        stateDir: "/tmp/firstpass-state",
+        stateDir: "/tmp/m87-state",
         configExists: false,
         dbExists: false,
         detectedAgent: { spec: "acp:claude", id: "claude" },
@@ -27,7 +27,7 @@ describe("setup/InitWizardView", () => {
       h(InitWizardView, { model, width: 100, height: 30 }),
     );
 
-    expect(out).toContain("firstpass");
+    expect(out).toContain("m87");
     expect(out).toContain("setup wizard");
     expect(out).toContain("AI Agent");
     expect(out).toContain("Detect automatically");
@@ -36,7 +36,7 @@ describe("setup/InitWizardView", () => {
   });
 
   it("marks the repository input with a cursor so it reads as editable", () => {
-    const context = { stateDir: "/tmp/firstpass-state" };
+    const context = { stateDir: "/tmp/m87-state" };
     const repoInput = renderToString(
       h(InitWizardView, {
         model: buildInitWizardModel(

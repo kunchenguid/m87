@@ -18,25 +18,25 @@ describe("agent/shellenv applyLoginShellEnv", () => {
   let savedTty;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-shellenv-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-shellenv-"));
     fakeShell = join(dir, "fake-shell.sh");
     writeFileSync(fakeShell, `#!/bin/sh\necho "PATH=${HARVESTED}"\n`);
     chmodSync(fakeShell, 0o755);
 
     savedPath = process.env.PATH;
-    savedSkip = process.env.FIRSTPASS_SKIP_SHELLENV;
+    savedSkip = process.env.M87_SKIP_SHELLENV;
     savedTty = process.stdout.isTTY;
 
     process.env.PATH = "/original/bin";
-    process.env.FIRSTPASS_LOGIN_SHELL = fakeShell;
-    delete process.env.FIRSTPASS_SKIP_SHELLENV;
+    process.env.M87_LOGIN_SHELL = fakeShell;
+    delete process.env.M87_SKIP_SHELLENV;
   });
 
   afterEach(() => {
     process.env.PATH = savedPath;
-    if (savedSkip === undefined) delete process.env.FIRSTPASS_SKIP_SHELLENV;
-    else process.env.FIRSTPASS_SKIP_SHELLENV = savedSkip;
-    delete process.env.FIRSTPASS_LOGIN_SHELL;
+    if (savedSkip === undefined) delete process.env.M87_SKIP_SHELLENV;
+    else process.env.M87_SKIP_SHELLENV = savedSkip;
+    delete process.env.M87_LOGIN_SHELL;
     process.stdout.isTTY = savedTty;
     rmSync(dir, { recursive: true, force: true });
   });
@@ -59,9 +59,9 @@ describe("agent/shellenv applyLoginShellEnv", () => {
     expect(process.env.PATH).toBe("/original/bin");
   });
 
-  it("respects FIRSTPASS_SKIP_SHELLENV even without a TTY", () => {
+  it("respects M87_SKIP_SHELLENV even without a TTY", () => {
     process.stdout.isTTY = false;
-    process.env.FIRSTPASS_SKIP_SHELLENV = "1";
+    process.env.M87_SKIP_SHELLENV = "1";
     applyLoginShellEnv();
     expect(process.env.PATH).toBe("/original/bin");
   });

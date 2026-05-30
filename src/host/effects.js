@@ -69,7 +69,7 @@ export function createEffects(ctx) {
       // elapses, so a flaky `gh auth status` or a rate-limit window self-heals.
       const failures = (plugin.consecutive_failures ?? 0) + 1;
       // last_error keeps the clean, actionable first warning (it surfaces in
-      // `firstpass status`); the log gets every warning so the real cause is
+      // `m87 status`); the log gets every warning so the real cause is
       // recorded even when the headline message is generic guidance.
       const lastError = res.warnings?.[0] ?? res.status;
       const detail = res.warnings?.join("; ") || res.status;

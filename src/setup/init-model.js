@@ -169,11 +169,11 @@ export function buildInitApplyPlan(input = {}, context = {}) {
           ? `${agentName(context.detectedAgent.spec)} (auto-detected)`
           : "an auto-detected agent";
   const sourceConfig = githubConfig(selections);
-  const commands = ["firstpass"];
+  const commands = ["m87"];
   const sideEffects = [
     {
       id: "state",
-      label: `Store your data in ${context.stateDir ?? "the FirstPass folder"}`,
+      label: `Store your data in ${context.stateDir ?? "the M87 folder"}`,
     },
     { id: "database", label: "Set up your local inbox" },
     { id: "config", label: `Use ${agentLabel} for recommendations` },
@@ -184,10 +184,10 @@ export function buildInitApplyPlan(input = {}, context = {}) {
       id: "github",
       label: "Connect your GitHub repositories",
     });
-    commands.unshift("firstpass plugin add github");
+    commands.unshift("m87 plugin add github");
     commands.unshift(
       [
-        "firstpass plugin configure github",
+        "m87 plugin configure github",
         ...Object.entries(sourceConfig).map(
           ([key, value]) =>
             `--config ${key}=${shellQuote(JSON.stringify(value))}`,
@@ -199,15 +199,15 @@ export function buildInitApplyPlan(input = {}, context = {}) {
   if (selections.installService) {
     sideEffects.push({
       id: "service",
-      label: "Start FirstPass now and launch it automatically at startup",
+      label: "Start M87 now and launch it automatically at startup",
     });
-    commands.unshift("firstpass daemon install");
+    commands.unshift("m87 daemon install");
   } else if (selections.startDaemon) {
     sideEffects.push({
       id: "daemon-start",
-      label: "Start FirstPass for this session",
+      label: "Start M87 for this session",
     });
-    commands.unshift("firstpass daemon start");
+    commands.unshift("m87 daemon start");
   }
 
   return {
@@ -296,7 +296,7 @@ function agentScreen(selections, context) {
   return {
     heading: "AI Agent",
     body: [
-      "FirstPass uses an AI agent on your computer to draft recommendations.",
+      "M87 uses an AI agent on your computer to draft recommendations.",
       "It may share details from your synced issues and pull requests with that agent.",
       "Next, connect GitHub or skip source setup for now.",
     ],
@@ -309,7 +309,7 @@ function sourceScreen(selections) {
     return {
       heading: "Connect GitHub",
       body: [
-        "Choose which repositories or activity FirstPass should sync.",
+        "Choose which repositories or activity M87 should sync.",
         "Make sure you're signed in to GitHub first (gh auth login).",
       ],
       choices: Object.entries(GITHUB_SCOPE_LABELS).map(([id, label]) => ({
@@ -320,7 +320,7 @@ function sourceScreen(selections) {
             ? selections.githubRepos.length > 0
               ? selections.githubRepos.join(", ")
               : "Enter owner/repo below."
-            : "FirstPass figures this out when it syncs.",
+            : "M87 figures this out when it syncs.",
         selected: selections.githubScope === id,
       })),
       input:
@@ -350,7 +350,7 @@ function sourceScreen(selections) {
       {
         id: "skip",
         label: "Skip for now",
-        detail: "Set up FirstPass locally and add a source later.",
+        detail: "Set up M87 locally and add a source later.",
         selected: selections.source !== "github",
       },
     ],
@@ -362,7 +362,7 @@ function screenFor(selections, context, plan) {
     return agentScreen(selections, context);
   if (selections.currentStep === "source") return sourceScreen(selections);
   // Final step: review everything that will happen, and choose whether to run
-  // FirstPass in the background. That choice (the radios below) drives the
+  // M87 in the background. That choice (the radios below) drives the
   // service/session daemon, so its side effect is left out of the reviewed list
   // to avoid restating it.
   return {
@@ -389,7 +389,7 @@ function screenFor(selections, context, plan) {
       {
         id: "none",
         label: "Don't start it yet",
-        detail: "You can start FirstPass yourself later.",
+        detail: "You can start M87 yourself later.",
         selected: !selections.installService && !selections.startDaemon,
       },
     ],

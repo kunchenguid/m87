@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 
 const execFileAsync = promisify(execFile);
 
-const PLUGIN_PATH = "plugins/gmail/firstpass-src-gmail.js";
+const PLUGIN_PATH = "plugins/gmail/m87-src-gmail.js";
 
 const CREDENTIALED_ENV = {
   ...process.env,
@@ -57,7 +57,7 @@ describe("gmail source plugin (contract v2)", () => {
     ]);
     const manifest = JSON.parse(stdout);
 
-    expect(manifest.protocol_version).toBe("firstpass.plugin.v2");
+    expect(manifest.protocol_version).toBe("m87.plugin.v2");
     expect(manifest.plugin.id).toBe("gmail");
     expect(manifest.item_types).toEqual([
       { type: "email_thread", display_name: "Email Thread" },
@@ -79,7 +79,7 @@ describe("gmail source plugin (contract v2)", () => {
       CREDENTIALED_ENV,
     );
 
-    expect(result.protocol_version).toBe("firstpass.plugin.v2");
+    expect(result.protocol_version).toBe("m87.plugin.v2");
     expect(result.status).toBe("complete");
     expect(result.items).toBeUndefined();
 
@@ -143,7 +143,7 @@ describe("gmail source plugin (contract v2)", () => {
       (event) => event.external_id === "gmail:thread:thread-1",
     );
     expect(thread.metadata.display_handle).toBe(
-      "alice@example.com · Re: FirstPass Gmail integration follow-up",
+      "alice@example.com · Re: M87 Gmail integration follow-up",
     );
   });
 
@@ -184,7 +184,7 @@ describe("gmail source plugin (contract v2)", () => {
 
     const result = await runPlugin(["configure"], { config: {} }, env);
 
-    expect(result.protocol_version).toBe("firstpass.plugin.v2");
+    expect(result.protocol_version).toBe("m87.plugin.v2");
     expect(result.credentials_required).toBe(true);
     expect(result.credentials).toEqual({ required: true });
     expect(result.warnings[0]).toContain("OS credential store");
@@ -209,7 +209,7 @@ describe("gmail source plugin (contract v2)", () => {
     delete env.GOOGLE_APPLICATION_CREDENTIALS;
 
     const missing = await runPlugin(["doctor"], {}, env);
-    expect(missing.protocol_version).toBe("firstpass.plugin.v2");
+    expect(missing.protocol_version).toBe("m87.plugin.v2");
     expect(missing.status).toBe("ok");
     const missingCheck = missing.checks.find(
       (check) => check.id === "gmail-credentials",
@@ -229,7 +229,7 @@ describe("gmail source plugin (contract v2)", () => {
     const prepare = await runPlugin(["prepare-automation-workspace"], {
       job: { id: "job-1" },
     });
-    expect(prepare.protocol_version).toBe("firstpass.plugin.v2");
+    expect(prepare.protocol_version).toBe("m87.plugin.v2");
     expect(prepare.status).toBe("failed");
 
     const submit = await runPlugin(["submit-automation-workspace"], {
@@ -240,11 +240,11 @@ describe("gmail source plugin (contract v2)", () => {
 
   test("rejects unsupported protocol versions", async () => {
     await expect(
-      runPlugin(["configure", "--protocol-version", "firstpass.plugin.v1"], {
+      runPlugin(["configure", "--protocol-version", "m87.plugin.v1"], {
         config: {},
       }),
     ).rejects.toThrow(
-      "unsupported protocol version: firstpass.plugin.v1; expected firstpass.plugin.v2",
+      "unsupported protocol version: m87.plugin.v1; expected m87.plugin.v2",
     );
   });
 });

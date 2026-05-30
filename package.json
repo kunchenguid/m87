@@ -1,10 +1,10 @@
 {
-  "name": "firstpass",
+  "name": "m87",
   "version": "0.1.2",
   "private": false,
   "type": "module",
   "bin": {
-    "firstpass": "dist/cli.js"
+    "m87": "dist/cli.js"
   },
   "publishConfig": {
     "access": "public"

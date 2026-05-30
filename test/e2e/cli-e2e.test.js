@@ -15,8 +15,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createMockAcpTarget,
-  runFirstpass,
-  startFirstpassDaemon,
+  runM87,
+  startM87Daemon,
   waitFor,
 } from "../support/e2e-harness.js";
 
@@ -58,26 +58,26 @@ const RECOMMENDATION = {
   usage: { tokens_in: 120, tokens_out: 60 },
 };
 
-describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
+describe("e2e: m87 CLI with a real daemon (sole consumer)", () => {
   let homeDir;
   let stateDir;
   let env;
   let target;
   let daemon;
 
-  const firstpass = (...args) => runFirstpass(CLI, args, env);
+  const m87 = (...args) => runM87(CLI, args, env);
   const parse = ({ stdout }) => yaml.load(stdout);
-  const openDb = () => new Database(join(stateDir, "firstpass.sqlite"));
+  const openDb = () => new Database(join(stateDir, "m87.sqlite"));
 
   beforeEach(async () => {
-    homeDir = mkdtempSync(join(tmpdir(), "firstpass-e2e-"));
-    stateDir = join(homeDir, ".firstpass");
+    homeDir = mkdtempSync(join(tmpdir(), "m87-e2e-"));
+    stateDir = join(homeDir, ".m87");
     env = {
       ...process.env,
       HOME: homeDir,
-      FIRSTPASS_STATE_DIR: stateDir,
-      FIRSTPASS_SKIP_SHELLENV: "1",
-      FIRSTPASS_AGENT_PROBE_PATH: "",
+      M87_STATE_DIR: stateDir,
+      M87_SKIP_SHELLENV: "1",
+      M87_AGENT_PROBE_PATH: "",
     };
     target = await createMockAcpTarget(
       { homeDir, stateDir },
@@ -105,45 +105,45 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
   }
 
   it("mutating commands require a running daemon", async () => {
-    await firstpass("init");
+    await m87("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock");
+    await m87("plugin", "add", "mock");
     // no daemon started yet
-    const err = await firstpass("approve", "rec-x").catch((e) => e);
+    const err = await m87("approve", "rec-x").catch((e) => e);
     expect(err.stderr).toContain("daemon not running");
     expect(err.code).toBe(1);
   });
 
   it("plugin add installs immediately with no trust gate", async () => {
-    await firstpass("init");
-    const added = parse(await firstpass("plugin", "add", "mock"));
+    await m87("init");
+    const added = parse(await m87("plugin", "add", "mock"));
     expect(added.status).toBe("installed");
     expect(added.plugin.id).toBe("mock");
 
-    const listed = parse(await firstpass("plugin", "list"));
+    const listed = parse(await m87("plugin", "list"));
     expect(listed.installed.map((p) => p.id)).toContain("mock");
   });
 
   it("daemon status reports not_running when no daemon is up", async () => {
-    await firstpass("init");
-    const { stdout } = await firstpass("daemon", "status");
+    await m87("init");
+    const { stdout } = await m87("daemon", "status");
     const status = yaml.load(stdout);
     expect(status.running).toBe(false);
     expect(status.status).toBe("not_running");
   });
 
   it("daemon syncs+triages; approve flows to handled via the event log", async () => {
-    await firstpass("init");
+    await m87("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock");
+    await m87("plugin", "add", "mock");
 
-    daemon = startFirstpassDaemon(env);
+    daemon = startM87Daemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
 
     // poke a sync; the daemon (sole consumer) ingests + triages
-    await firstpass("sync");
+    await m87("sync");
     const inbox = await waitFor(async () => {
-      const listed = parse(await firstpass("list"));
+      const listed = parse(await m87("list"));
       return listed.inbox.length === 1 ? listed.inbox : null;
     });
     expect(inbox, daemon.stderr).not.toBeNull();
@@ -151,11 +151,11 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
     expect(inbox[0].title).toBe("Crash on empty config");
 
     // gate: external-write needs confirmation
-    const needsConfirm = await firstpass("approve", recId).catch((e) => e);
+    const needsConfirm = await m87("approve", recId).catch((e) => e);
     expect(needsConfirm.stdout).toContain("confirmation_required");
 
     // confirm -> daemon executes action + fix job -> item settles to handled
-    const approved = parse(await firstpass("approve", recId, "--confirm"));
+    const approved = parse(await m87("approve", recId, "--confirm"));
     expect(approved.item_state, daemon.stderr).toBe("handled");
 
     const db = openDb();
@@ -211,12 +211,12 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
   });
 
   it("dismiss flows through the daemon", async () => {
-    await firstpass("init");
+    await m87("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock");
-    daemon = startFirstpassDaemon(env);
+    await m87("plugin", "add", "mock");
+    daemon = startM87Daemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
-    await firstpass("sync");
+    await m87("sync");
     const itemId = await waitFor(async () => {
       const db = openDb();
       const row = db.prepare("select id from items").get();
@@ -224,22 +224,22 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
       return row?.id ?? null;
     });
     expect(itemId).toBeTruthy();
-    const dismissed = parse(await firstpass("dismiss", itemId));
+    const dismissed = parse(await m87("dismiss", itemId));
     expect(dismissed.status).toBe("dismissed");
   });
 
   it("a restarted daemon resumes from the persisted log and settles in-flight work", async () => {
-    await firstpass("init");
+    await m87("init");
     writeConfig();
-    await firstpass("plugin", "add", "mock");
+    await m87("plugin", "add", "mock");
 
     // first daemon: sync + triage an item into a live recommendation
-    daemon = startFirstpassDaemon(env);
+    daemon = startM87Daemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
     const pid1 = daemon.pid;
-    await firstpass("sync");
+    await m87("sync");
     const recId = await waitFor(async () => {
-      const listed = parse(await firstpass("list"));
+      const listed = parse(await m87("list"));
       return listed.inbox.length === 1
         ? listed.inbox[0].recommendation_id
         : null;
@@ -253,7 +253,7 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
 
     // crash + restart: a fresh process picks up the same state dir
     await daemon.stop();
-    daemon = startFirstpassDaemon(env);
+    daemon = startM87Daemon(env);
     const pid2 = daemon.pid;
     expect(pid2).not.toBe(pid1);
     await waitFor(
@@ -263,8 +263,8 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
     );
 
     // the recommendation survived the restart: approve flows to handled
-    await firstpass("approve", recId).catch((e) => e); // confirmation gate
-    const approved = parse(await firstpass("approve", recId, "--confirm"));
+    await m87("approve", recId).catch((e) => e); // confirmation gate
+    const approved = parse(await m87("approve", recId, "--confirm"));
     expect(approved.item_state, daemon.stderr).toBe("handled");
 
     const db = openDb();
@@ -287,7 +287,7 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
   });
 
   it("a failing agent is recorded without wedging the daemon", async () => {
-    await firstpass("init");
+    await m87("init");
     // point the agent at a target that returns no recommendation -> triage throws
     const badTarget = await createMockAcpTarget(
       { homeDir, stateDir },
@@ -302,11 +302,11 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
         plugins: {},
       }),
     );
-    await firstpass("plugin", "add", "mock");
+    await m87("plugin", "add", "mock");
 
-    daemon = startFirstpassDaemon(env);
+    daemon = startM87Daemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
-    await firstpass("sync");
+    await m87("sync");
 
     // the failure surfaces as a failed agent_run, not a crashed daemon
     const failed = await waitFor(() => {
@@ -335,9 +335,9 @@ describe("e2e: firstpass CLI with a real daemon (sole consumer)", () => {
     }
 
     // the daemon survived: it still reports running and still consumes events
-    const status = parse(await firstpass("daemon", "status"));
+    const status = parse(await m87("daemon", "status"));
     expect(status.running).toBe(true);
-    const dismissed = parse(await firstpass("dismiss", failed.item_id));
+    const dismissed = parse(await m87("dismiss", failed.item_id));
     expect(dismissed.status, daemon.stderr).toBe("dismissed");
   });
 });

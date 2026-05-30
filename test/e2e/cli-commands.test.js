@@ -11,8 +11,8 @@ import pkg from "../../package.json" with { type: "json" };
 
 import {
   createMockAcpTarget,
-  runFirstpass,
-  startFirstpassDaemon,
+  runM87,
+  startM87Daemon,
   waitFor,
 } from "../support/e2e-harness.js";
 
@@ -45,10 +45,10 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
   let target;
   let daemon;
 
-  const firstpass = (...args) => runFirstpass(CLI, args, env);
+  const m87 = (...args) => runM87(CLI, args, env);
   const parse = ({ stdout }) => yaml.load(stdout);
   const localState = (itemId) => {
-    const db = new Database(join(stateDir, "firstpass.sqlite"));
+    const db = new Database(join(stateDir, "m87.sqlite"));
     const row = db
       .prepare("select local_state from items where id=?")
       .get(itemId);
@@ -57,21 +57,21 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
   };
 
   beforeEach(async () => {
-    homeDir = mkdtempSync(join(tmpdir(), "firstpass-cmds-"));
-    stateDir = join(homeDir, ".firstpass");
+    homeDir = mkdtempSync(join(tmpdir(), "m87-cmds-"));
+    stateDir = join(homeDir, ".m87");
     env = {
       ...process.env,
       HOME: homeDir,
-      FIRSTPASS_STATE_DIR: stateDir,
-      FIRSTPASS_SKIP_SHELLENV: "1",
-      FIRSTPASS_AGENT_PROBE_PATH: "",
-      FIRSTPASS_SERVICE_DRY_RUN: "1",
+      M87_STATE_DIR: stateDir,
+      M87_SKIP_SHELLENV: "1",
+      M87_AGENT_PROBE_PATH: "",
+      M87_SERVICE_DRY_RUN: "1",
     };
     target = await createMockAcpTarget(
       { homeDir, stateDir },
       { response: RECOMMENDATION },
     );
-    await firstpass("init");
+    await m87("init");
     writeFileSync(
       join(stateDir, "config.yaml"),
       yaml.dump({
@@ -81,12 +81,12 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
         plugins: {},
       }),
     );
-    await firstpass("plugin", "add", "mock");
-    daemon = startFirstpassDaemon(env);
+    await m87("plugin", "add", "mock");
+    daemon = startM87Daemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
-    await firstpass("sync");
+    await m87("sync");
     await waitFor(async () => {
-      const listed = parse(await firstpass("list"));
+      const listed = parse(await m87("list"));
       return listed.inbox.length === 1;
     });
   });
@@ -98,85 +98,81 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
   });
 
   it("view shows the item and its recommendation", async () => {
-    const v = parse(await firstpass("view", "mock:issue-1"));
+    const v = parse(await m87("view", "mock:issue-1"));
     expect(v.status).toBe("found");
     expect(v.item.title).toBe("Crash on empty config");
     expect(v.recommendation.summary).toBe("Reply and fix");
   });
 
   it("open prints the source url; copy-handoff prints a prompt", async () => {
-    expect(parse(await firstpass("open", "mock:issue-1")).url).toBe(
-      "mock://issue/1",
-    );
+    expect(parse(await m87("open", "mock:issue-1")).url).toBe("mock://issue/1");
     expect(
-      parse(await firstpass("copy-handoff", "mock:issue-1")).handoff_prompt,
+      parse(await m87("copy-handoff", "mock:issue-1")).handoff_prompt,
     ).toContain("Crash on empty config");
   });
 
   it("rerun supersedes and re-triages with a fresh recommendation", async () => {
-    const before = parse(await firstpass("view", "mock:issue-1")).recommendation
-      .id;
+    const before = parse(await m87("view", "mock:issue-1")).recommendation.id;
     const r = parse(
-      await firstpass("rerun", "mock:issue-1", "--instructions", "be terse"),
+      await m87("rerun", "mock:issue-1", "--instructions", "be terse"),
     );
     expect(r.status, daemon.stderr).toBe("reran");
-    const after = parse(await firstpass("view", "mock:issue-1")).recommendation
-      .id;
+    const after = parse(await m87("view", "mock:issue-1")).recommendation.id;
     expect(after).not.toBe(before);
   });
 
   it("mutating commands refuse when the daemon is down", async () => {
     await daemon.stop();
     daemon = undefined;
-    const err = await firstpass("dismiss", "mock:issue-1").catch((e) => e);
+    const err = await m87("dismiss", "mock:issue-1").catch((e) => e);
     expect(err.stderr).toContain("daemon not running");
   });
 
   it("state export -> import round-trips the plugin set", async () => {
     const file = join(homeDir, "state.yaml");
-    const { stdout } = await firstpass("state", "export");
+    const { stdout } = await m87("state", "export");
     writeFileSync(file, stdout);
-    const imported = parse(await firstpass("state", "import", file));
+    const imported = parse(await m87("state", "import", file));
     expect(imported.status).toBe("imported");
     expect(imported.plugins).toBe(1);
   });
 
   it("daemon status reports the running daemon", async () => {
-    const status = parse(await firstpass("daemon", "status"));
+    const status = parse(await m87("daemon", "status"));
     expect(status.running).toBe(true);
     expect(typeof status.pid).toBe("number");
   });
 
   it("daemon install/uninstall manage a service unit (dry run)", async () => {
-    const installed = parse(await firstpass("daemon", "install"));
+    const installed = parse(await m87("daemon", "install"));
     expect(installed.status).toBe("installed");
     expect(["launchd", "systemd", "schtasks"]).toContain(installed.manager);
     expect(installed.activation).toBe("skipped_dry_run");
-    const uninstalled = parse(await firstpass("daemon", "uninstall"));
+    const uninstalled = parse(await m87("daemon", "uninstall"));
     expect(uninstalled.status).toBe("uninstalled");
   });
 
   it("snooze hides the item from the inbox and folds it to snoozed", async () => {
-    const snoozed = parse(await firstpass("snooze", "mock:issue-1", "1d"));
+    const snoozed = parse(await m87("snooze", "mock:issue-1", "1d"));
     expect(snoozed.status, daemon.stderr).toBe("snoozed");
     expect(Date.parse(snoozed.until)).toBeGreaterThan(Date.now());
     expect(localState("mock:issue-1")).toBe("snoozed");
     // a future snooze drops out of the active inbox
-    expect(parse(await firstpass("list")).inbox).toHaveLength(0);
+    expect(parse(await m87("list")).inbox).toHaveLength(0);
   });
 
   it("mark-handled settles the item and clears it from the inbox", async () => {
-    const handled = parse(await firstpass("mark-handled", "mock:issue-1"));
+    const handled = parse(await m87("mark-handled", "mock:issue-1"));
     expect(handled.status, daemon.stderr).toBe("handled");
     expect(localState("mock:issue-1")).toBe("handled");
-    expect(parse(await firstpass("list")).inbox).toHaveLength(0);
+    expect(parse(await m87("list")).inbox).toHaveLength(0);
   });
 
   it("update reports up_to_date when latest == current", async () => {
     const out = parse(
-      await runFirstpass(CLI, ["update"], {
+      await runM87(CLI, ["update"], {
         ...env,
-        FIRSTPASS_LATEST_VERSION: pkg.version,
+        M87_LATEST_VERSION: pkg.version,
       }),
     );
     expect(out.status).toBe("up_to_date");

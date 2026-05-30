@@ -1,20 +1,20 @@
-<h1 align="center">firstpass</h1>
+<h1 align="center">m87</h1>
 
 <p align="center">
-  <a href="https://github.com/kunchenguid/firstpass/actions/workflows/ci.yml"
+  <a href="https://github.com/kunchenguid/m87/actions/workflows/ci.yml"
     ><img
       alt="CI"
-      src="https://img.shields.io/github/actions/workflow/status/kunchenguid/firstpass/ci.yml?style=flat-square&label=ci"
+      src="https://img.shields.io/github/actions/workflow/status/kunchenguid/m87/ci.yml?style=flat-square&label=ci"
   /></a>
-  <a href="https://github.com/kunchenguid/firstpass/actions/workflows/release-please.yml"
+  <a href="https://github.com/kunchenguid/m87/actions/workflows/release-please.yml"
     ><img
       alt="Release"
-      src="https://img.shields.io/github/actions/workflow/status/kunchenguid/firstpass/release-please.yml?style=flat-square&label=release"
+      src="https://img.shields.io/github/actions/workflow/status/kunchenguid/m87/release-please.yml?style=flat-square&label=release"
   /></a>
-  <a href="https://www.npmjs.com/package/firstpass"
+  <a href="https://www.npmjs.com/package/m87"
     ><img
       alt="npm"
-      src="https://img.shields.io/npm/v/firstpass?style=flat-square"
+      src="https://img.shields.io/npm/v/m87?style=flat-square"
   /></a>
   <a href="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
     ><img
@@ -38,11 +38,11 @@
 Your issues and pull requests pile up faster than you can read them.
 You could hand the whole thing to an agent, but then it is commenting, closing, and merging on your behalf while you are not looking - and that is exactly the part you do not want to give away.
 
-`firstpass` splits the work.
+`m87` splits the work.
 A local daemon syncs your sources, an AI agent reads each item and recommends what to do, and the recommendation sits in a queue.
 Nothing source-visible happens until you review the exact outgoing action and explicitly approve it.
 
-- **Local-first** - the queue, daemon, SQLite database, and ACP sessions all live under `~/.firstpass`.
+- **Local-first** - the queue, daemon, SQLite database, and ACP sessions all live under `~/.m87`.
   No hosted backend.
 - **Preview-then-approve** - the agent only recommends.
   Every external write waits behind a preview and explicit approval; CLI approval uses `--confirm`, and destructive actions need `--confirm-destructive`.
@@ -53,29 +53,29 @@ Nothing source-visible happens until you review the exact outgoing action and ex
 Run the guided setup in a terminal:
 
 ```sh
-$ firstpass init
+$ m87 init
 ```
 
-The wizard creates local state, lets you use auto-detect or pick a detected AI agent, connects GitHub or skips source setup, and finishes by choosing whether FirstPass runs in the background at login, for this session only, or later.
+The wizard creates local state, lets you use auto-detect or pick a detected AI agent, connects GitHub or skips source setup, and finishes by choosing whether M87 runs in the background at login, for this session only, or later.
 For scripts or CI, use flags instead of prompts:
 
 ```sh
-$ firstpass init --yes \
+$ m87 init --yes \
   --agent auto \
   --plugin github \
   --github-repo <owner>/<repo>
-$ firstpass sync
-$ firstpass
+$ m87 sync
+$ m87
 ```
 
 External writes still wait behind preview and approval when using the CLI:
 
 ```sh
-$ firstpass preview <recommendation-id>
-$ firstpass approve <recommendation-id> --confirm
+$ m87 preview <recommendation-id>
+$ m87 approve <recommendation-id> --confirm
 ```
 
-Run `firstpass` with no arguments in a terminal to open the live interactive inbox instead.
+Run `m87` with no arguments in a terminal to open the live interactive inbox instead.
 Use ↑/↓ to move between items, press `1`-`9` to select an option, review the WILL DO detail, then press `a` to approve the selected option.
 Use `j`/`k` to scroll long WILL DO details.
 Press `i` for queue details, startup help, and other inbox info; press `i` or Esc to return.
@@ -85,16 +85,16 @@ Press `i` for queue details, startup help, and other inbox info; press `i` or Es
 **npm (global)**
 
 ```sh
-npm install -g firstpass
-firstpass --version
+npm install -g m87
+m87 --version
 ```
 
 **From source**
 
 ```sh
-git clone https://github.com/kunchenguid/firstpass
-cd firstpass
-npm install -g .   # builds dist/ via prepack, then installs the `firstpass` binary
+git clone https://github.com/kunchenguid/m87
+cd m87
+npm install -g .   # builds dist/ via prepack, then installs the `m87` binary
 ```
 
 To hack on the code without installing, run it straight from source with `node src/cli/index.js <command>` (see [Development](#development)).
@@ -128,36 +128,36 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 
 - **The daemon is the sole actor** - syncing, triage, and writes all flow through one background process so there is a single source of truth and one audit trail.
 - **Approval is preview-then-approve** - the CLI `preview` command and the TUI WILL DO detail render the precise effect before a human approval reaches a source.
-- **Agent is ACP-pluggable** - `firstpass` auto-detects an installed provider CLI (`claude`, then `codex`, then `opencode`) as its `acp:` target, or you set one explicitly in config.
+- **Agent is ACP-pluggable** - `m87` auto-detects an installed provider CLI (`claude`, then `codex`, then `opencode`) as its `acp:` target, or you set one explicitly in config.
 - **Automation jobs stay reviewable** - approving a fix option queues a coding-agent job that the daemon runs into a draft pull request.
   It never merges for you.
 
 ## CLI Reference
 
-| Command                          | Description                                                  |
-| -------------------------------- | ------------------------------------------------------------ |
-| `firstpass init`                 | Open guided setup on a TTY, or initialize local state        |
-| `firstpass status`               | Show resolved agent, plugins, queue, and inbox status        |
-| `firstpass sync`                 | Nudge the daemon to sync + triage all active plugins now     |
-| `firstpass list`                 | List the active review inbox                                 |
-| `firstpass view <item>`          | Show one item and its recommendation detail                  |
-| `firstpass open <item>`          | Print the item's source URL                                  |
-| `firstpass copy-handoff <item>`  | Print a copyable agent handoff prompt for one item           |
-| `firstpass preview <rec>`        | Preview what approving an option would do (the gate)         |
-| `firstpass approve <rec>`        | Approve an option - the one human gate                       |
-| `firstpass triage <item>`        | Triage one newly synced item                                 |
-| `firstpass rerun <item>`         | Supersede the recommendation and re-triage an item           |
-| `firstpass dismiss <item>`       | Dismiss an item                                              |
-| `firstpass mark-handled <item>`  | Mark an item handled                                         |
-| `firstpass snooze <item> <dur>`  | Snooze an item until later (e.g. `1d`, `4h`)                 |
-| `firstpass plugin ...`           | `add`, `list`, `configure`, `sync`, `doctor` source plugins  |
-| `firstpass job ...`              | `list`, `view`, `attach` automation jobs                     |
-| `firstpass daemon ...`           | `start`, `stop`, `status`, `restart`, `install`, `uninstall` |
-| `firstpass audit export`         | Export the action audit trail                                |
-| `firstpass audit receipt <id>`   | Show a receipt for an approval                               |
-| `firstpass state export\|import` | Portable, secret-redacted state export/import                |
-| `firstpass retention cleanup`    | Delete expired prompt contexts                               |
-| `firstpass update [--check]`     | Check for and install a newer release from npm               |
+| Command                    | Description                                                  |
+| -------------------------- | ------------------------------------------------------------ |
+| `m87 init`                 | Open guided setup on a TTY, or initialize local state        |
+| `m87 status`               | Show resolved agent, plugins, queue, and inbox status        |
+| `m87 sync`                 | Nudge the daemon to sync + triage all active plugins now     |
+| `m87 list`                 | List the active review inbox                                 |
+| `m87 view <item>`          | Show one item and its recommendation detail                  |
+| `m87 open <item>`          | Print the item's source URL                                  |
+| `m87 copy-handoff <item>`  | Print a copyable agent handoff prompt for one item           |
+| `m87 preview <rec>`        | Preview what approving an option would do (the gate)         |
+| `m87 approve <rec>`        | Approve an option - the one human gate                       |
+| `m87 triage <item>`        | Triage one newly synced item                                 |
+| `m87 rerun <item>`         | Supersede the recommendation and re-triage an item           |
+| `m87 dismiss <item>`       | Dismiss an item                                              |
+| `m87 mark-handled <item>`  | Mark an item handled                                         |
+| `m87 snooze <item> <dur>`  | Snooze an item until later (e.g. `1d`, `4h`)                 |
+| `m87 plugin ...`           | `add`, `list`, `configure`, `sync`, `doctor` source plugins  |
+| `m87 job ...`              | `list`, `view`, `attach` automation jobs                     |
+| `m87 daemon ...`           | `start`, `stop`, `status`, `restart`, `install`, `uninstall` |
+| `m87 audit export`         | Export the action audit trail                                |
+| `m87 audit receipt <id>`   | Show a receipt for an approval                               |
+| `m87 state export\|import` | Portable, secret-redacted state export/import                |
+| `m87 retention cleanup`    | Delete expired prompt contexts                               |
+| `m87 update [--check]`     | Check for and install a newer release from npm               |
 
 ### Flags
 
@@ -193,7 +193,7 @@ The bundled GitHub plugin syncs issues and pull requests through `gh`, and suppo
 
 ```sh
 gh auth status || gh auth login
-firstpass init --yes \
+m87 init --yes \
   --plugin github \
   --github-repo <owner>/<repo>
 ```
@@ -201,11 +201,11 @@ firstpass init --yes \
 Manual plugin setup is still available:
 
 ```sh
-firstpass plugin add github
-firstpass plugin configure github \
+m87 plugin add github
+m87 plugin configure github \
   --config username=<github-login> \
   --config explicit_repos=<owner>/<repo>
-firstpass plugin doctor                 # confirm the daemon resolves your gh credentials
+m87 plugin doctor                 # confirm the daemon resolves your gh credentials
 ```
 
 `gh` must be authenticated in the same environment the daemon runs under.
@@ -235,8 +235,8 @@ It does not perform live Gmail writes.
 
 ## Configuration
 
-Config lives at `~/.firstpass/config.yaml` by default.
-Set `FIRSTPASS_STATE_DIR` to change where the SQLite database, plugin state, ACP sessions, daemon PID, daemon log, and retained artifacts are stored.
+Config lives at `~/.m87/config.yaml` by default.
+Set `M87_STATE_DIR` to change where the SQLite database, plugin state, ACP sessions, daemon PID, daemon log, and retained artifacts are stored.
 
 ```yaml
 agent: null # auto-detect a provider CLI (claude, then codex, then opencode); or set an acp: target
@@ -245,24 +245,24 @@ acp_registry_overrides: {}
 plugins: {}
 ```
 
-If `~/.firstpass/AGENTS.md` exists, its contents are passed to every triage as a user policy, so you can steer recommendations globally.
-Run `firstpass status` to see the resolved agent.
+If `~/.m87/AGENTS.md` exists, its contents are passed to every triage as a user policy, so you can steer recommendations globally.
+Run `m87 status` to see the resolved agent.
 
 ## Running As A Service
 
 ```sh
-firstpass daemon run            # foreground; logs every sync/triage/warn until Ctrl-C
-firstpass daemon start          # detached background process
-firstpass daemon status         # report whether the daemon is running
-firstpass daemon install        # managed OS service: launchd / systemd --user / schtasks
-firstpass daemon uninstall
+m87 daemon run            # foreground; logs every sync/triage/warn until Ctrl-C
+m87 daemon start          # detached background process
+m87 daemon status         # report whether the daemon is running
+m87 daemon install        # managed OS service: launchd / systemd --user / schtasks
+m87 daemon uninstall
 ```
 
-A detached or managed daemon writes operational logs to `~/.firstpass/daemon.log`, including startup, shutdown, loop errors, sync failures, and sync recovery.
+A detached or managed daemon writes operational logs to `~/.m87/daemon.log`, including startup, shutdown, loop errors, sync failures, and sync recovery.
 Failed source syncs are retried with backoff instead of being parked forever; a plugin returns to active after a later successful sync.
 
-A managed daemon launched from a GUI context inherits a minimal `PATH`, so `firstpass` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs.
-Set `FIRSTPASS_SKIP_SHELLENV=1` to disable that resolution.
+A managed daemon launched from a GUI context inherits a minimal `PATH`, so `m87` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs.
+Set `M87_SKIP_SHELLENV=1` to disable that resolution.
 
 ## Development
 

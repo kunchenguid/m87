@@ -5,12 +5,12 @@ import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runFirstpass, waitFor } from "../support/e2e-harness.js";
+import { runM87, waitFor } from "../support/e2e-harness.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
 
-// `firstpass daemon start` detaches the daemon and (the fix) redirects its
+// `m87 daemon start` detaches the daemon and (the fix) redirects its
 // stdout+stderr into daemon.log. Before the fix, stdio was discarded, so the
 // advertised log file never existed and failures left no trace. This exercises
 // the real production path (start -> log file written -> stop).
@@ -20,24 +20,24 @@ describe("e2e: daemon start writes operational logs to daemon.log", () => {
   let env;
   let started = false;
 
-  const firstpass = (...args) => runFirstpass(CLI, args, env);
+  const m87 = (...args) => runM87(CLI, args, env);
 
   beforeEach(() => {
-    homeDir = mkdtempSync(join(tmpdir(), "firstpass-log-"));
-    stateDir = join(homeDir, ".firstpass");
+    homeDir = mkdtempSync(join(tmpdir(), "m87-log-"));
+    stateDir = join(homeDir, ".m87");
     env = {
       ...process.env,
       HOME: homeDir,
-      FIRSTPASS_STATE_DIR: stateDir,
-      FIRSTPASS_SKIP_SHELLENV: "1",
-      FIRSTPASS_AGENT_PROBE_PATH: "",
+      M87_STATE_DIR: stateDir,
+      M87_SKIP_SHELLENV: "1",
+      M87_AGENT_PROBE_PATH: "",
     };
   });
 
   afterEach(async () => {
     if (started) {
       try {
-        await firstpass("daemon", "stop");
+        await m87("daemon", "stop");
       } catch {
         // best-effort
       }
@@ -47,9 +47,9 @@ describe("e2e: daemon start writes operational logs to daemon.log", () => {
   });
 
   it("creates daemon.log and records the startup line", async () => {
-    await firstpass("init");
+    await m87("init");
 
-    const res = await firstpass("daemon", "start");
+    const res = await m87("daemon", "start");
     started = true;
     expect(res.stdout).toContain("daemon.log");
 
@@ -66,9 +66,9 @@ describe("e2e: daemon start writes operational logs to daemon.log", () => {
   });
 
   it("records the startup line after restart", async () => {
-    await firstpass("init");
+    await m87("init");
 
-    await firstpass("daemon", "start");
+    await m87("daemon", "start");
     started = true;
 
     const logPath = join(stateDir, "daemon.log");
@@ -78,7 +78,7 @@ describe("e2e: daemon start writes operational logs to daemon.log", () => {
       return text.includes("daemon started") ? text : null;
     });
 
-    const res = await firstpass("daemon", "restart");
+    const res = await m87("daemon", "restart");
     expect(res.stdout).toContain("daemon.log");
 
     const log = await waitFor(() => {
