@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runFirstpass, waitFor } from "../support/e2e-harness.js";
+import { runM87, waitFor } from "../support/e2e-harness.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SLEEPER = join(
@@ -33,7 +33,7 @@ describe("e2e process cleanup", () => {
   let dir;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-cleanup-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-cleanup-"));
   });
 
   afterEach(() => {
@@ -43,7 +43,7 @@ describe("e2e process cleanup", () => {
   it("kills a hung invocation (and its grandchildren) when it exceeds the timeout", async () => {
     const gcPidFile = join(dir, "grandchild.pid");
 
-    const err = await runFirstpass(SLEEPER, [gcPidFile], process.env, {
+    const err = await runM87(SLEEPER, [gcPidFile], process.env, {
       timeoutMs: 500,
     }).catch((e) => e);
 

@@ -64,7 +64,7 @@ function InboxApp({ db, agentTarget, daemonPid }) {
   // the event would sit unprocessed, so we refuse and tell the user.
   function act(event, label) {
     if (!daemonPid()) {
-      setNotice("daemon not running - start it with `firstpass daemon start`");
+      setNotice("daemon not running - start it with `m87 daemon start`");
       return;
     }
     enqueue(db, event, { lane: "interactive" });

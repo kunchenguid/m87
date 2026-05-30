@@ -19,7 +19,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 // run-scoped directory so the top-level globalTeardown can sweep anything a
 // hard-killed worker leaves behind. See test/support/global-setup.js.
 
-export const TEST_PID_DIR = join(tmpdir(), "firstpass-test-pids");
+export const TEST_PID_DIR = join(tmpdir(), "m87-test-pids");
 const liveChildren = new Set();
 
 function trackChild(child) {
@@ -91,7 +91,7 @@ function installSweeper() {
 installSweeper();
 
 /**
- * Run the firstpass CLI as a tracked subprocess in its own process group with
+ * Run the m87 CLI as a tracked subprocess in its own process group with
  * a hard timeout. Resolves to `{ stdout, stderr }` on a clean exit; otherwise
  * rejects with an Error carrying `.code`, `.stdout`, `.stderr`, and `.timedOut`
  * - the same shape tests relied on from `promisify(execFile)`.
@@ -102,7 +102,7 @@ installSweeper();
  * @param {{ timeoutMs?: number }} [options]
  * @returns {Promise<{ stdout: string, stderr: string }>}
  */
-export function runFirstpass(cliPath, args, env, { timeoutMs = 30000 } = {}) {
+export function runM87(cliPath, args, env, { timeoutMs = 30000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = trackChild(
       spawn(process.execPath, [cliPath, ...args], {
@@ -132,7 +132,7 @@ export function runFirstpass(cliPath, args, env, { timeoutMs = 30000 } = {}) {
         resolve({ stdout, stderr });
         return;
       }
-      const label = `firstpass ${args.join(" ")}`;
+      const label = `m87 ${args.join(" ")}`;
       reject(
         Object.assign(
           new Error(
@@ -156,7 +156,7 @@ const acpMockBinPath = join(
 );
 
 /**
- * @typedef {object} FirstpassTestWorkspace
+ * @typedef {object} M87TestWorkspace
  * @property {string} homeDir
  * @property {string} binDir
  * @property {string} stateDir
@@ -172,12 +172,12 @@ const acpMockBinPath = join(
  */
 
 /**
- * @returns {Promise<FirstpassTestWorkspace>}
+ * @returns {Promise<M87TestWorkspace>}
  */
-export async function createFirstpassTestWorkspace() {
-  const homeDir = await mkdtemp(join(tmpdir(), "firstpass-home-"));
+export async function createM87TestWorkspace() {
+  const homeDir = await mkdtemp(join(tmpdir(), "m87-home-"));
   const binDir = join(homeDir, "bin");
-  const stateDir = join(homeDir, ".firstpass");
+  const stateDir = join(homeDir, ".m87");
 
   await mkdir(binDir, { recursive: true });
 
@@ -193,22 +193,22 @@ export async function createFirstpassTestWorkspace() {
 }
 
 /**
- * @param {FirstpassTestWorkspace} workspace
+ * @param {M87TestWorkspace} workspace
  * @param {string[]} args
  * @returns {Promise<{ stdout: string, stderr: string }>}
  */
-export async function runBuiltFirstpass(workspace, args) {
+export async function runBuiltM87(workspace, args) {
   return execFileAsync(process.execPath, ["src/cli/index.js", ...args], {
     env: workspace.env,
   });
 }
 
 /**
- * Start the firstpass daemon (the sole loop/consumer) as a background process.
+ * Start the m87 daemon (the sole loop/consumer) as a background process.
  * Returns a handle with `.stop()` and captured stderr. Config must be written
  * before calling so the daemon loads the agent target.
  */
-export function startFirstpassDaemon(env) {
+export function startM87Daemon(env) {
   // Detached so the daemon leads its own process group: cleanup can group-kill
   // it together with any plugin grandchildren it spawned mid-sync. `.signal()`
   // / `.stop()` below still target the daemon's pid alone (not the group), so

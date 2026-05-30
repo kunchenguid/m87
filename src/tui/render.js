@@ -347,7 +347,7 @@ export function renderInboxView(db, opts = {}) {
   const model = buildInboxModel(db, opts);
   const lines = [];
   lines.push(
-    `FirstPass Inbox  (${model.count} ${model.count === 1 ? "item" : "items"})`,
+    `M87 Inbox  (${model.count} ${model.count === 1 ? "item" : "items"})`,
   );
   lines.push(RULE);
 

@@ -7,7 +7,7 @@ import {
 } from "../../src/agent/detect.js";
 import { parseAcpJsonOutput, runAcpTurn } from "../../src/agent/acp.js";
 import {
-  createFirstpassTestWorkspace,
+  createM87TestWorkspace,
   createMockAcpTarget,
 } from "../support/e2e-harness.js";
 
@@ -18,10 +18,10 @@ describe("agent/detect", () => {
     );
   });
   it("returns null when no provider is on an empty probe path", () => {
-    const prev = process.env.FIRSTPASS_AGENT_PROBE_PATH;
-    process.env.FIRSTPASS_AGENT_PROBE_PATH = "";
+    const prev = process.env.M87_AGENT_PROBE_PATH;
+    process.env.M87_AGENT_PROBE_PATH = "";
     expect(detectAgentSpec()).toBeNull();
-    process.env.FIRSTPASS_AGENT_PROBE_PATH = prev;
+    process.env.M87_AGENT_PROBE_PATH = prev;
   });
   it("returns an empty list of specs on an empty probe path", () => {
     expect(detectAgentSpecs("")).toEqual([]);
@@ -61,7 +61,7 @@ describe("agent/acp parseAcpJsonOutput", () => {
 describe("agent/acp runAcpTurn (real acp-mock)", () => {
   let ws;
   beforeEach(async () => {
-    ws = await createFirstpassTestWorkspace();
+    ws = await createM87TestWorkspace();
   });
   afterEach(async () => {
     await ws.cleanup();

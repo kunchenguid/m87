@@ -40,7 +40,7 @@ describe("core/handlers", () => {
   let dir;
   let db;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-h-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-h-"));
     db = createDatabase(join(dir, "h.sqlite"));
   });
   afterEach(() => {

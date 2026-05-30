@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FirstPass GitHub source plugin - contract v2 (emit-only-events).
+// M87 GitHub source plugin - contract v2 (emit-only-events).
 //
 // `sync` is a pure diff: given the fingerprint baseline core hands back, it
 // lists live GitHub issues/pull requests through the `gh` CLI, computes a
@@ -23,7 +23,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const PROTOCOL_VERSION = "firstpass.plugin.v2";
+const PROTOCOL_VERSION = "m87.plugin.v2";
 
 const command = process.argv[2];
 const protocolVersionArgIndex = process.argv.indexOf("--protocol-version");
@@ -55,9 +55,9 @@ const emit = (value) => {
 // --- gh CLI ----------------------------------------------------------------
 
 const getGhBinary = () =>
-  typeof process.env.FIRSTPASS_GH_BIN === "string" &&
-  process.env.FIRSTPASS_GH_BIN.length > 0
-    ? process.env.FIRSTPASS_GH_BIN
+  typeof process.env.M87_GH_BIN === "string" &&
+  process.env.M87_GH_BIN.length > 0
+    ? process.env.M87_GH_BIN
     : "gh";
 
 const runGh = async (args, options = {}) => {
@@ -1325,7 +1325,7 @@ const MANIFEST = {
     id: "github",
     version: "2.0.0",
     display_name: "GitHub",
-    publisher: "firstpass",
+    publisher: "m87",
   },
   capabilities: ["sync", "fetch", "actions", "automation"],
   item_types: [
@@ -1484,9 +1484,9 @@ const resolveActionRole = (input, itemExternalId) => {
 // --- fix automation helpers (FU-13/14/15) ----------------------------------
 
 const getNoMistakesBin = () =>
-  typeof process.env.FIRSTPASS_NO_MISTAKES_BIN === "string" &&
-  process.env.FIRSTPASS_NO_MISTAKES_BIN.length > 0
-    ? process.env.FIRSTPASS_NO_MISTAKES_BIN
+  typeof process.env.M87_NO_MISTAKES_BIN === "string" &&
+  process.env.M87_NO_MISTAKES_BIN.length > 0
+    ? process.env.M87_NO_MISTAKES_BIN
     : "no-mistakes";
 
 const noMistakesAvailable = async () => {
@@ -2163,7 +2163,7 @@ const main = async () => {
 
     try {
       await runGh(["auth", "status"]);
-      const workspaceRoot = await mkdtemp(join(tmpdir(), "firstpass-gh-ws-"));
+      const workspaceRoot = await mkdtemp(join(tmpdir(), "m87-gh-ws-"));
       const workspacePath = join(workspaceRoot, "repo");
       await runGh(["repo", "clone", target.repository, workspacePath]);
       const defaultBranch = (
@@ -2189,7 +2189,7 @@ const main = async () => {
         return;
       }
 
-      const branch = `firstpass/fix-${jobId}`;
+      const branch = `m87/fix-${jobId}`;
       await runGit(["checkout", "-b", branch], workspacePath);
       emit({
         protocol_version: PROTOCOL_VERSION,
@@ -2252,7 +2252,7 @@ const main = async () => {
 
       await runGit(["add", "-A"], workspacePath);
       await runGit(
-        ["commit", "-m", `firstpass automated fix for job ${jobId}`],
+        ["commit", "-m", `m87 automated fix for job ${jobId}`],
         workspacePath,
       );
       // Branch name is read after the commit so an unborn HEAD (fresh checkout
@@ -2393,7 +2393,7 @@ const main = async () => {
           warnings: prUrl
             ? []
             : [
-                "no-mistakes pushed the branch; PR not detected yet. Re-run `firstpass job attach` to recheck.",
+                "no-mistakes pushed the branch; PR not detected yet. Re-run `m87 job attach` to recheck.",
               ],
         });
         return;
@@ -2411,9 +2411,9 @@ const main = async () => {
             "--head",
             branch,
             "--title",
-            `firstpass fix: job ${jobId}`,
+            `m87 fix: job ${jobId}`,
             "--body",
-            `Automated fix prepared by FirstPass for job ${jobId}.`,
+            `Automated fix prepared by M87 for job ${jobId}.`,
           ],
           { cwd: workspacePath },
         )

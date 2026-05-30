@@ -14,8 +14,8 @@ export default defineConfig({
     globalSetup: ["./test/support/global-setup.js"],
     // Keep agent auto-detection hermetic: tests inherit this empty probe path
     // (via `...process.env`) so a developer's real `claude`/`codex` CLI is not
-    // discovered. Tests that exercise detection set FIRSTPASS_AGENT_PROBE_PATH
+    // discovered. Tests that exercise detection set M87_AGENT_PROBE_PATH
     // explicitly to a temp directory of fake binaries.
-    env: { FIRSTPASS_AGENT_PROBE_PATH: "", FIRSTPASS_SKIP_SHELLENV: "1" },
+    env: { M87_AGENT_PROBE_PATH: "", M87_SKIP_SHELLENV: "1" },
   },
 });

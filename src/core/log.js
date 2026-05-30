@@ -1,6 +1,6 @@
 // A tiny structured logger for the daemon. Lines go to a stream (the daemon's
-// stderr by default), which `firstpass daemon start` now redirects to
-// ~/.firstpass/daemon.log so operational events are actually recorded instead
+// stderr by default), which `m87 daemon start` now redirects to
+// ~/.m87/daemon.log so operational events are actually recorded instead
 // of discarded. Format is one human-scannable line per event:
 //
 //   2026-05-28T12:00:00.000Z WARN plugin sync failed plugin=github status=...

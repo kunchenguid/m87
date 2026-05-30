@@ -9,7 +9,7 @@ import { buildTriagePrompt, loadUserPolicy } from "../../src/agent/prompts.js";
 describe("agent/prompts user policy (FU-17)", () => {
   let dir;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-policy-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-policy-"));
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });

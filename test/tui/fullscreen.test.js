@@ -46,7 +46,7 @@ describe("tui/launchInteractiveTui fullscreen", () => {
   let dir;
   let db;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-fs-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-fs-"));
     db = createDatabase(join(dir, "t.sqlite"));
   });
   afterEach(() => {
@@ -75,7 +75,7 @@ describe("tui/launchInteractiveTui fullscreen", () => {
     restore();
 
     const enter = stdout.data.indexOf(ENTER_ALT);
-    const content = stdout.data.indexOf("firstpass"); // the header brand
+    const content = stdout.data.indexOf("m87"); // the header brand
     const leave = stdout.data.indexOf(LEAVE_ALT);
 
     // The original bug switched buffers from a mounted effect, *after* the first

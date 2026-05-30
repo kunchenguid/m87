@@ -62,7 +62,7 @@ const CLI_ENTRY = fileURLToPath(import.meta.url);
 function findPluginsDir() {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 6; i++) {
-    if (existsSync(join(dir, "plugins", "mock", "firstpass-src-mock.js"))) {
+    if (existsSync(join(dir, "plugins", "mock", "m87-src-mock.js"))) {
       return join(dir, "plugins");
     }
     const parent = dirname(dir);
@@ -74,9 +74,9 @@ function findPluginsDir() {
 
 const pluginsDir = findPluginsDir();
 const bundledPluginPaths = {
-  mock: join(pluginsDir, "mock", "firstpass-src-mock.js"),
-  github: join(pluginsDir, "github", "firstpass-src-github.js"),
-  gmail: join(pluginsDir, "gmail", "firstpass-src-gmail.js"),
+  mock: join(pluginsDir, "mock", "m87-src-mock.js"),
+  github: join(pluginsDir, "github", "m87-src-github.js"),
+  gmail: join(pluginsDir, "gmail", "m87-src-gmail.js"),
 };
 
 const out = (obj) => {
@@ -107,7 +107,7 @@ function daemonPid() {
 function requireDaemon() {
   const pid = daemonPid();
   if (!pid) {
-    fail("daemon not running; start it with `firstpass daemon start`");
+    fail("daemon not running; start it with `m87 daemon start`");
     return null;
   }
   return pid;
@@ -167,7 +167,7 @@ function parseConfigPairs(pairs = []) {
 
 const program = new Command();
 program
-  .name("firstpass")
+  .name("m87")
   .description("Local-first review queue (event-driven)")
   .version(pkg.version);
 
@@ -175,7 +175,7 @@ program
 program.action(async () => {
   const { dbPath } = getStatePaths();
   if (!existsSync(dbPath)) {
-    return fail("not initialized; run `firstpass init` first");
+    return fail("not initialized; run `m87 init` first");
   }
   const config = loadConfig();
   const agentTarget = resolveEffectiveAgentSpec(config) ?? "none";
@@ -318,7 +318,7 @@ async function applyInitSelections(selections, context, mode) {
   out(result);
 }
 
-// Graceful, cross-platform daemon stop, shared with `firstpass daemon stop`.
+// Graceful, cross-platform daemon stop, shared with `m87 daemon stop`.
 async function gracefulStopDaemon() {
   const { pidPath, controlAddress } = getStatePaths();
   if (!existsSync(pidPath)) return { status: "not_running" };
@@ -913,7 +913,7 @@ program
         status: "not_new",
         item_id: id,
         local_state: item.local_state,
-        hint: `use \`firstpass rerun ${id}\` to re-triage`,
+        hint: `use \`m87 rerun ${id}\` to re-triage`,
       });
       process.exitCode = 1;
       return;
@@ -1128,7 +1128,7 @@ program
       `Why it surfaced: ${item.attention_reason}`,
       ctx
         ? `Context: ${ctx.agent_context_json}`
-        : "Context: (none stored; run `firstpass triage`)",
+        : "Context: (none stored; run `m87 triage`)",
     ].join("\n");
     out({ status: "found", item_id: id, handoff_prompt: handoff });
   });
@@ -1387,7 +1387,7 @@ daemon
     };
     // Terminal/service signals trigger graceful shutdown on POSIX. Windows has
     // no POSIX signals, so there the control channel's "stop" command is the
-    // graceful path (see `firstpass daemon stop`).
+    // graceful path (see `m87 daemon stop`).
     process.on("SIGINT", stop);
     if (process.platform !== "win32") {
       process.on("SIGTERM", stop);
@@ -1641,7 +1641,7 @@ daemon
 // --- update ----------------------------------------------------------------
 program
   .command("update")
-  .description("Check for and install a newer firstpass release")
+  .description("Check for and install a newer m87 release")
   .option("--check", "only check; never install")
   .action(async (options) => {
     const current = program.version();
@@ -1655,7 +1655,7 @@ program
     if (compareSemver(current, latest) >= 0) {
       return out({ status: "up_to_date", current, latest });
     }
-    const command = `npm install -g firstpass@${latest}`;
+    const command = `npm install -g m87@${latest}`;
     if (options.check || isUpdateDryRun()) {
       return out({
         status: "update_available",
@@ -1666,7 +1666,7 @@ program
       });
     }
     try {
-      execFileSync("npm", ["install", "-g", `firstpass@${latest}`], {
+      execFileSync("npm", ["install", "-g", `m87@${latest}`], {
         stdio: "ignore",
         timeout: 120000,
       });
@@ -1693,7 +1693,7 @@ export function run(argv = process.argv) {
 
 // A global `npm install` exposes this file through a bin symlink, so
 // process.argv[1] (the symlink) won't equal the resolved module path. Compare
-// real paths so the CLI actually runs when invoked as the installed `firstpass`.
+// real paths so the CLI actually runs when invoked as the installed `m87`.
 const isMain =
   process.argv[1] &&
   realpathSync(fileURLToPath(import.meta.url)) ===

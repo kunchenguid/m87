@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FirstPass Gmail source plugin - contract v2 (emit-only-events).
+// M87 Gmail source plugin - contract v2 (emit-only-events).
 //
 // `sync` is a pure diff: given the fingerprint baseline core hands back, it
 // emits item events (created/updated/closed) for whatever changed and returns
@@ -7,11 +7,11 @@
 //
 // DEMO ONLY: this plugin serves recorded Gmail thread fixtures and does not
 // send live writes. Live mailbox reads/writes require Gmail OAuth credentials
-// in GOOGLE_APPLICATION_CREDENTIALS or the OS credential store; FirstPass core
+// in GOOGLE_APPLICATION_CREDENTIALS or the OS credential store; M87 core
 // config stores no Gmail secrets. Action execution records offline fixtures
 // rather than calling the Gmail API.
 
-const PROTOCOL_VERSION = "firstpass.plugin.v2";
+const PROTOCOL_VERSION = "m87.plugin.v2";
 
 const SUPPORTED_PROTOCOL_VERSION = PROTOCOL_VERSION;
 const protocolVersionArgIndex = process.argv.indexOf("--protocol-version");
@@ -53,7 +53,7 @@ const MANIFEST = {
     id: "gmail",
     version: "2.0.0",
     display_name: "Gmail",
-    publisher: "firstpass",
+    publisher: "m87",
   },
   capabilities: ["sync", "fetch", "actions"],
   item_types: [{ type: "email_thread", display_name: "Email Thread" }],
@@ -141,7 +141,7 @@ function sourceThreads(config) {
     {
       external_id: "gmail:thread:thread-1",
       item_type: "email_thread",
-      title: "Re: FirstPass Gmail integration follow-up",
+      title: "Re: M87 Gmail integration follow-up",
       actor: "alice@example.com",
       state: "unread",
       url: getGmailThreadUrl("gmail:thread:thread-1"),
@@ -158,7 +158,7 @@ function sourceThreads(config) {
       // metadata convention the GitHub plugin uses, for a non-GitHub source.
       metadata: {
         display_handle:
-          "alice@example.com · Re: FirstPass Gmail integration follow-up",
+          "alice@example.com · Re: M87 Gmail integration follow-up",
       },
       payload: {
         type: "thread_received",
@@ -329,10 +329,10 @@ function handleConfigure() {
     warnings:
       credentialSource === null
         ? [
-            "Gmail OAuth credentials must stay in the OS credential store or GOOGLE_APPLICATION_CREDENTIALS; FirstPass core config stores no Gmail secrets.",
+            "Gmail OAuth credentials must stay in the OS credential store or GOOGLE_APPLICATION_CREDENTIALS; M87 core config stores no Gmail secrets.",
           ]
         : [
-            "Gmail OAuth credentials were detected outside FirstPass core config; keep refresh tokens in the OS credential store or Google client tooling.",
+            "Gmail OAuth credentials were detected outside M87 core config; keep refresh tokens in the OS credential store or Google client tooling.",
           ],
   };
 }
@@ -401,7 +401,7 @@ function handleFetch(input) {
   return {
     protocol_version: PROTOCOL_VERSION,
     human_context: {
-      title: "Re: FirstPass Gmail integration follow-up",
+      title: "Re: M87 Gmail integration follow-up",
       compact:
         "Alice asked for a follow-up on the Gmail integration plan and attached a short requirements note.",
       url: itemUrl,
@@ -411,7 +411,7 @@ function handleFetch(input) {
         "Gmail thread from alice@example.com is waiting on the user to reply with next steps for the integration plan.",
       full: [
         "Mailbox: gmail/work",
-        "Thread: Re: FirstPass Gmail integration follow-up",
+        "Thread: Re: M87 Gmail integration follow-up",
         "From: Alice <alice@example.com>",
         "To: user@example.com",
         "Latest message: Can you send the concrete Gmail integration next steps today?",
@@ -519,7 +519,7 @@ function handleExecuteAction(input) {
     Reflect.set(
       externalResult,
       "draft_url",
-      `${getGmailThreadUrl(itemExternalId)}?compose=firstpass-${draftId}`,
+      `${getGmailThreadUrl(itemExternalId)}?compose=m87-${draftId}`,
     );
   }
   if (recordedArchiveExecution) {

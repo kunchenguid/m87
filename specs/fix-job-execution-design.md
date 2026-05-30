@@ -1,7 +1,7 @@
 # Fix-Job Execution Design
 
 Status: implemented architecture note.
-Scope: explain how firstpass turns queued automation jobs into coding-agent runs that produce a draft pull request.
+Scope: explain how m87 turns queued automation jobs into coding-agent runs that produce a draft pull request.
 This document maps the implemented work onto the jobs table, plugin protocol, and ACP runtime.
 
 ## Goal And Non-Goals
@@ -21,7 +21,7 @@ Fix jobs are queued by approvals, executed by daemon effects, and inspected thro
 - The `jobs` table stores queued, running, succeeded, and failed automation jobs with phase, prompt, metadata, and timestamps.
 - On approval, an option's `automation: { kind, prompt }` inserts a queued job and schedules the daemon effect.
 - The fix-job effect runner in `src/host/effects.js` prepares the plugin workspace, runs the ACP coding agent in that workspace, submits the workspace, and records phase transitions.
-- `firstpass job attach` can re-check a waiting job when PR detection was delayed.
+- `m87 job attach` can re-check a waiting job when PR detection was delayed.
 - The ACP runtime accepts a working directory so fix jobs run inside the prepared workspace rather than the caller's current directory.
 
 So the data model, queueing path, execution path, and PR re-detection path are implemented.
@@ -101,7 +101,7 @@ Per cycle:
 3. Run the ACP coding agent in `workspace_path` with the job prompt -> `running_agent`.
 4. `submit-automation-workspace` -> `submitting` -> `pr_opened`, `no_changes`, or `waiting_for_pr`.
 5. Persist phase, `pr_url`, and metadata at each transition through job events.
-6. Use `firstpass job attach` / `detect-automation-pr` to close a `waiting_for_pr` job after delayed PR creation.
+6. Use `m87 job attach` / `detect-automation-pr` to close a `waiting_for_pr` job after delayed PR creation.
 
 Queue-backed execution keeps remote writes paced and observable while preserving the same event-driven projection model as triage and actions.
 

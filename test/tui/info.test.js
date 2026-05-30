@@ -77,7 +77,7 @@ describe("tui info screen toggle", () => {
   beforeEach(() => {
     priorCi = process.env.CI;
     process.env.CI = "true";
-    dir = mkdtempSync(join(tmpdir(), "firstpass-info-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-info-"));
     db = createDatabase(join(dir, "t.sqlite"));
   });
   afterEach(() => {
@@ -96,7 +96,7 @@ describe("tui info screen toggle", () => {
   it("pressing i opens the info screen with queue counts", async () => {
     const out = await mountAndType(db, ["i"]);
     expect(out).toContain("dead-letter");
-    expect(out).toContain("firstpass daemon start");
+    expect(out).toContain("m87 daemon start");
     // the info surface is the most recent frame (stdout accumulates every frame,
     // so we compare where each surface last appears rather than mere presence)
     expect(out.lastIndexOf("dead-letter")).toBeGreaterThan(

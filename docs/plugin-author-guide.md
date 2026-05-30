@@ -1,15 +1,15 @@
-# FirstPass Plugin Author Guide
+# M87 Plugin Author Guide
 
-FirstPass source plugins are ordinary executables that speak a small JSON protocol over stdin and stdout.
+M87 source plugins are ordinary executables that speak a small JSON protocol over stdin and stdout.
 The core owns local storage, triage lifecycle, approval, and audit.
 Plugins own source-specific authentication, sync semantics, fetched context, action validation, previews, execution, and source URLs.
 
 ## Executable Contract
 
-Plugin executables should be named `firstpass-src-<source>`.
+Plugin executables should be named `m87-src-<source>`.
 Every command accepts one JSON object on stdin and writes one JSON object on stdout.
 Diagnostic logs may go to stderr, but user-facing bug reports can redact stderr by default, so protocol failures should be represented in stdout when possible.
-The core passes `--protocol-version firstpass.plugin.v2` to plugin commands.
+The core passes `--protocol-version m87.plugin.v2` to plugin commands.
 Exit code `0` means the command returned a protocol-level response, including application statuses such as `permission_denied`.
 Nonzero exit codes are treated as transport or plugin process failures.
 
@@ -32,13 +32,13 @@ Supported commands are:
 ## Manifest
 
 The manifest is the provenance and capability boundary between core and plugin.
-Keep it accurate because FirstPass stores it and uses it to validate recommendations.
+Keep it accurate because M87 stores it and uses it to validate recommendations.
 
 Protocol-required top-level fields are:
 
 | Field              | Meaning                                                                         |
 | ------------------ | ------------------------------------------------------------------------------- |
-| `protocol_version` | The protocol version returned by the plugin, currently `firstpass.plugin.v2`.   |
+| `protocol_version` | The protocol version returned by the plugin, currently `m87.plugin.v2`.         |
 | `plugin`           | Object with `id`, `version`, optional `display_name`, and optional `publisher`. |
 
 Recommended top-level metadata fields are:
@@ -53,7 +53,7 @@ Example:
 
 ```json
 {
-  "protocol_version": "firstpass.plugin.v2",
+  "protocol_version": "m87.plugin.v2",
   "plugin": {
     "id": "tickets",
     "version": "1.0.0",
@@ -93,7 +93,7 @@ Third-party plugins should document the package manager, package name, explicit 
 Disclose every source credential scope the plugin expects in setup documentation.
 Prefer the narrowest practical credential guidance.
 If writes are optional, document how users can configure read-only credentials and what capabilities will be unavailable.
-Never store secrets in FirstPass core config unless a source makes that unavoidable.
+Never store secrets in M87 core config unless a source makes that unavoidable.
 Prefer source CLIs, OS keychain storage, OAuth token stores, or plugin-owned encrypted files.
 
 Keep capabilities and the action catalog current so the manifest accurately describes what the plugin can do.
@@ -139,7 +139,7 @@ Safety levels are:
 
 | Safety           | Meaning                                                                      |
 | ---------------- | ---------------------------------------------------------------------------- |
-| `local_only`     | Changes only local FirstPass state.                                          |
+| `local_only`     | Changes only local M87 state.                                                |
 | `source_private` | Changes private source state such as archive, read state, labels, or drafts. |
 | `external_write` | Sends text or visible interaction to other people.                           |
 | `destructive`    | Closes, deletes, blocks, merges, or otherwise changes durable shared state.  |
@@ -154,13 +154,13 @@ When the source does not support client tokens, use natural keys or other best-e
 
 ## Authoring Checklist
 
-- Use `firstpass-src-<source>` as the executable name.
-- Validate `--protocol-version firstpass.plugin.v2` before processing commands.
+- Use `m87-src-<source>` as the executable name.
+- Validate `--protocol-version m87.plugin.v2` before processing commands.
 - Keep stdout as exactly one JSON protocol object per command.
 - Keep action schemas small and strict with `additionalProperties: false` when possible.
 - Return stable item ids, event ids, evidence ids, and source URLs.
 - Treat fingerprints as opaque plugin-owned state and make sync idempotent.
-- Put the most actionable sync warning first because FirstPass stores it as the plugin status error; include detailed diagnostics in later warnings for daemon logs.
+- Put the most actionable sync warning first because M87 stores it as the plugin status error; include detailed diagnostics in later warnings for daemon logs.
 - Disclose all credential scopes and provenance accurately in setup documentation.
 - Prefer drafts or private source state over visible sends when the source supports it.
 - Validate and preview every remote action immediately before execution.

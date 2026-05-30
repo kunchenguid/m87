@@ -1,5 +1,5 @@
-// Self-update helpers for `firstpass update`. Overridable for tests via
-// FIRSTPASS_LATEST_VERSION / FIRSTPASS_REGISTRY_URL / FIRSTPASS_UPDATE_DRY_RUN.
+// Self-update helpers for `m87 update`. Overridable for tests via
+// M87_LATEST_VERSION / M87_REGISTRY_URL / M87_UPDATE_DRY_RUN.
 
 export function compareSemver(a, b) {
   const left = String(a).split("-")[0].split(".");
@@ -15,14 +15,14 @@ export function compareSemver(a, b) {
 }
 
 export async function fetchLatestVersion() {
-  const override = process.env.FIRSTPASS_LATEST_VERSION;
+  const override = process.env.M87_LATEST_VERSION;
   if (typeof override === "string" && override.length > 0) {
     return override;
   }
   const registry = (
-    process.env.FIRSTPASS_REGISTRY_URL || "https://registry.npmjs.org"
+    process.env.M87_REGISTRY_URL || "https://registry.npmjs.org"
   ).replace(/\/$/, "");
-  const response = await globalThis.fetch(`${registry}/firstpass/latest`);
+  const response = await globalThis.fetch(`${registry}/m87/latest`);
   if (!response.ok) {
     throw new Error(`registry responded ${response.status}`);
   }
@@ -34,6 +34,6 @@ export async function fetchLatestVersion() {
 }
 
 export function isUpdateDryRun() {
-  const value = process.env.FIRSTPASS_UPDATE_DRY_RUN;
+  const value = process.env.M87_UPDATE_DRY_RUN;
   return typeof value === "string" && value.length > 0 && value !== "0";
 }

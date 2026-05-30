@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 // Must match TEST_PID_DIR in e2e-harness.js.
-const pidDir = join(tmpdir(), "firstpass-test-pids");
+const pidDir = join(tmpdir(), "m87-test-pids");
 // Only ever reap THIS repo's CLI - never a developer's installed `dist` daemon
 // or an unrelated process the OS happened to recycle a pid into.
 const cliPath = join(repoRoot, "src", "cli", "index.js");

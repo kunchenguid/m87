@@ -180,7 +180,7 @@ describe("tui option select-then-approve", () => {
   beforeEach(() => {
     priorCi = process.env.CI;
     process.env.CI = "true";
-    dir = mkdtempSync(join(tmpdir(), "firstpass-select-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-select-"));
     db = createDatabase(join(dir, "t.sqlite"));
     seed(db);
   });

@@ -22,19 +22,19 @@ describe("init apply daemon startup", () => {
   let originalStateDir;
 
   beforeEach(() => {
-    homeDir = mkdtempSync(join(tmpdir(), "firstpass-init-apply-"));
-    stateDir = join(homeDir, ".firstpass");
+    homeDir = mkdtempSync(join(tmpdir(), "m87-init-apply-"));
+    stateDir = join(homeDir, ".m87");
     mkdirSync(stateDir, { recursive: true });
-    originalStateDir = process.env.FIRSTPASS_STATE_DIR;
-    process.env.FIRSTPASS_STATE_DIR = stateDir;
+    originalStateDir = process.env.M87_STATE_DIR;
+    process.env.M87_STATE_DIR = stateDir;
     spawn.mockClear();
   });
 
   afterEach(() => {
     if (originalStateDir === undefined) {
-      delete process.env.FIRSTPASS_STATE_DIR;
+      delete process.env.M87_STATE_DIR;
     } else {
-      process.env.FIRSTPASS_STATE_DIR = originalStateDir;
+      process.env.M87_STATE_DIR = originalStateDir;
     }
     rmSync(homeDir, { recursive: true, force: true });
   });
@@ -42,7 +42,7 @@ describe("init apply daemon startup", () => {
   it("does not spawn another daemon when a live pid is recorded", () => {
     writeFileSync(join(stateDir, "daemon.pid"), String(process.pid));
 
-    const result = startDetachedDaemon("firstpass-cli.js");
+    const result = startDetachedDaemon("m87-cli.js");
 
     expect(result).toEqual({ status: "already_running", pid: process.pid });
     expect(spawn).not.toHaveBeenCalled();

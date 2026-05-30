@@ -11,7 +11,7 @@ import { readManifest } from "../../src/host/plugin.js";
 import { createEffects } from "../../src/host/effects.js";
 
 const MOCK = fileURLToPath(
-  new URL("../../plugins/mock/firstpass-src-mock.js", import.meta.url),
+  new URL("../../plugins/mock/m87-src-mock.js", import.meta.url),
 );
 
 // A logger that records every line so we can assert the daemon would log the
@@ -36,7 +36,7 @@ describe("host/effects sync: transient-failure retry state", () => {
     db
       .prepare(
         `insert into plugins (id, binary_path, version, protocol_version, manifest_json, config_json, status, installed_at)
-         values ('mock', ?, '2.0.0', 'firstpass.plugin.v2', ?, ?, 'active', 't')`,
+         values ('mock', ?, '2.0.0', 'm87.plugin.v2', ?, ?, 'active', 't')`,
       )
       .run(MOCK, "{}", JSON.stringify(config));
 
@@ -51,7 +51,7 @@ describe("host/effects sync: transient-failure retry state", () => {
     db.prepare("select * from plugins where id='mock'").get();
 
   beforeEach(async () => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-retry-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-retry-"));
     db = createDatabase(join(dir, "r.sqlite"));
     logger = makeCapturingLogger();
     // readManifest validates the mock is reachable; not strictly required here.

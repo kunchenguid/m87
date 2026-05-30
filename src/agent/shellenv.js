@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
 
 // POSIX-only: hydrate PATH from a login shell so GUI-launched daemons can find
-// provider CLIs. Disabled with FIRSTPASS_SKIP_SHELLENV, overridable for tests with
-// FIRSTPASS_LOGIN_SHELL.
+// provider CLIs. Disabled with M87_SKIP_SHELLENV, overridable for tests with
+// M87_LOGIN_SHELL.
 export function applyLoginShellEnv() {
-  const skip = process.env.FIRSTPASS_SKIP_SHELLENV;
+  const skip = process.env.M87_SKIP_SHELLENV;
   if (typeof skip === "string" && skip.length > 0 && skip !== "0") {
     return;
   }
@@ -22,7 +22,7 @@ export function applyLoginShellEnv() {
     return;
   }
   const shell =
-    process.env.FIRSTPASS_LOGIN_SHELL ||
+    process.env.M87_LOGIN_SHELL ||
     (process.env.SHELL && process.env.SHELL.length > 0
       ? process.env.SHELL
       : "/bin/sh");
@@ -37,7 +37,7 @@ export function applyLoginShellEnv() {
       if (sep <= 0) {
         continue;
       }
-      // Only adopt PATH so we never clobber firstpass's own runtime variables.
+      // Only adopt PATH so we never clobber m87's own runtime variables.
       if (line.slice(0, sep) === "PATH") {
         process.env.PATH = line.slice(sep + 1);
       }

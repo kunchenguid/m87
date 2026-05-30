@@ -13,14 +13,14 @@ import {
 } from "../../src/host/plugin.js";
 
 const MOCK = fileURLToPath(
-  new URL("../../plugins/mock/firstpass-src-mock.js", import.meta.url),
+  new URL("../../plugins/mock/m87-src-mock.js", import.meta.url),
 );
 
 describe("host/plugin (real mock subprocess, contract v2)", () => {
   it("reads the v2 manifest", async () => {
     const m = await readManifest(MOCK);
     expect(m.plugin.id).toBe("mock");
-    expect(m.protocol_version).toBe("firstpass.plugin.v2");
+    expect(m.protocol_version).toBe("m87.plugin.v2");
   });
 
   it("sync emits item events on first run and returns a fingerprint baseline", async () => {

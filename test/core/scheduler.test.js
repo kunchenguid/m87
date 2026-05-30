@@ -23,7 +23,7 @@ const insertPlugin = (db, id, over = {}) => {
     `insert into plugins
        (id, binary_path, version, protocol_version, manifest_json, config_json,
         status, consecutive_failures, next_retry_at, installed_at)
-     values (?, '/bin/x', '2.0.0', 'firstpass.plugin.v2', '{}', '{}', ?, ?, ?, 't')`,
+     values (?, '/bin/x', '2.0.0', 'm87.plugin.v2', '{}', '{}', ?, ?, ?, 't')`,
   ).run(id, row.status, row.consecutive_failures, row.next_retry_at);
 };
 
@@ -58,7 +58,7 @@ describe("core/scheduler: selectPluginsDueForSync", () => {
   let db;
   const now = "2026-05-28T12:00:00.000Z";
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-sched-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-sched-"));
     db = createDatabase(join(dir, "s.sqlite"));
   });
   afterEach(() => {

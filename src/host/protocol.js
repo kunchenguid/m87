@@ -5,7 +5,7 @@ import { z } from "zod";
 // pure diff), never items. Core holds the fingerprint baseline and folds the
 // events into item projections itself (plan §7).
 
-export const PROTOCOL_VERSION = "firstpass.plugin.v2";
+export const PROTOCOL_VERSION = "m87.plugin.v2";
 
 // --- manifest --------------------------------------------------------------
 export const manifestSchema = z

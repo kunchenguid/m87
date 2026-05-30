@@ -40,7 +40,7 @@ function Header({ model, width }) {
       flexDirection: "row",
       alignItems: "center",
     },
-    h(Chip, { label: "firstpass", color: theme.accent }),
+    h(Chip, { label: "m87", color: theme.accent }),
     h(Text, { color: theme.muted }, `  ${model.title}  `),
     h(Box, { flexGrow: 1 }),
     h(Text, { color: theme.green }, "● local state"),

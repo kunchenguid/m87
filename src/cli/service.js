@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 // Managed-service integration for `daemon install/uninstall`. Generates a
 // launchd plist (macOS), systemd user unit (Linux), or schtasks cmd (Windows)
-// that runs `firstpass daemon run` at login. FIRSTPASS_SERVICE_DRY_RUN skips the
+// that runs `m87 daemon run` at login. M87_SERVICE_DRY_RUN skips the
 // load/unload step (tests).
 
 export function getServiceLabel(stateDir) {
@@ -12,11 +12,11 @@ export function getServiceLabel(stateDir) {
     .update(typeof stateDir === "string" ? stateDir : "")
     .digest("hex")
     .slice(0, 10);
-  return `com.firstpass.daemon.${hash}`;
+  return `com.m87.daemon.${hash}`;
 }
 
 export function isServiceDryRun() {
-  const value = process.env.FIRSTPASS_SERVICE_DRY_RUN;
+  const value = process.env.M87_SERVICE_DRY_RUN;
   return typeof value === "string" && value.length > 0 && value !== "0";
 }
 
@@ -37,7 +37,7 @@ function renderLaunchdPlist(label, invocation, logPath) {
     "  </array>",
     "  <key>EnvironmentVariables</key>",
     "  <dict>",
-    "    <key>FIRSTPASS_DAEMON</key>",
+    "    <key>M87_DAEMON</key>",
     "    <string>1</string>",
     "  </dict>",
     "  <key>RunAtLoad</key>",
@@ -60,13 +60,13 @@ function renderSystemdUnit(invocation, logPath) {
     .join(" ");
   return [
     "[Unit]",
-    "Description=FirstPass local review daemon",
+    "Description=M87 local review daemon",
     "After=network.target",
     "",
     "[Service]",
     "Type=simple",
     `ExecStart=${execStart}`,
-    "Environment=FIRSTPASS_DAEMON=1",
+    "Environment=M87_DAEMON=1",
     "Restart=on-failure",
     "RestartSec=5",
     `StandardOutput=append:${logPath}`,
@@ -80,7 +80,7 @@ function renderSystemdUnit(invocation, logPath) {
 
 /**
  * @param {string} stateDir
- * @param {string} cliEntry absolute path to the firstpass CLI entry to invoke
+ * @param {string} cliEntry absolute path to the m87 CLI entry to invoke
  */
 export function getServicePlan(stateDir, cliEntry) {
   const label = getServiceLabel(stateDir);
@@ -134,7 +134,7 @@ export function getServicePlan(stateDir, cliEntry) {
       manager: "schtasks",
       label,
       unitPath,
-      content: `@echo off\r\nset FIRSTPASS_DAEMON=1\r\n${invocationLine}\r\n`,
+      content: `@echo off\r\nset M87_DAEMON=1\r\n${invocationLine}\r\n`,
       activate: {
         command: "schtasks",
         args: [

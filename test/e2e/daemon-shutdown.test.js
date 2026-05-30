@@ -10,8 +10,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createMockAcpTarget,
-  runFirstpass,
-  startFirstpassDaemon,
+  runM87,
+  startM87Daemon,
   waitFor,
 } from "../support/e2e-harness.js";
 
@@ -43,18 +43,18 @@ describe("e2e: daemon run shuts down promptly while a slow turn is in flight", (
   let env;
   let daemon;
 
-  const firstpass = (...args) => runFirstpass(CLI, args, env);
-  const openDb = () => new Database(join(stateDir, "firstpass.sqlite"));
+  const m87 = (...args) => runM87(CLI, args, env);
+  const openDb = () => new Database(join(stateDir, "m87.sqlite"));
 
   beforeEach(() => {
-    homeDir = mkdtempSync(join(tmpdir(), "firstpass-shutdown-"));
-    stateDir = join(homeDir, ".firstpass");
+    homeDir = mkdtempSync(join(tmpdir(), "m87-shutdown-"));
+    stateDir = join(homeDir, ".m87");
     env = {
       ...process.env,
       HOME: homeDir,
-      FIRSTPASS_STATE_DIR: stateDir,
-      FIRSTPASS_SKIP_SHELLENV: "1",
-      FIRSTPASS_AGENT_PROBE_PATH: "",
+      M87_STATE_DIR: stateDir,
+      M87_SKIP_SHELLENV: "1",
+      M87_AGENT_PROBE_PATH: "",
     };
   });
 
@@ -72,7 +72,7 @@ describe("e2e: daemon run shuts down promptly while a slow turn is in flight", (
       { homeDir, stateDir },
       { response: RECOMMENDATION, promptDelayMs: 30000 },
     );
-    await firstpass("init");
+    await m87("init");
     writeFileSync(
       join(stateDir, "config.yaml"),
       yaml.dump({
@@ -82,11 +82,11 @@ describe("e2e: daemon run shuts down promptly while a slow turn is in flight", (
         plugins: {},
       }),
     );
-    await firstpass("plugin", "add", "mock");
+    await m87("plugin", "add", "mock");
 
-    daemon = startFirstpassDaemon(env);
+    daemon = startM87Daemon(env);
     await waitFor(() => existsSync(join(stateDir, "daemon.pid")));
-    await firstpass("sync");
+    await m87("sync");
 
     const running = await waitFor(() => {
       const db = openDb();
@@ -99,14 +99,14 @@ describe("e2e: daemon run shuts down promptly while a slow turn is in flight", (
     expect(running, daemon.stderr).toBe(true);
   }
 
-  // The cross-platform path: `firstpass daemon stop` over the control socket
+  // The cross-platform path: `m87 daemon stop` over the control socket
   // (UDS on POSIX, named pipe on Windows). This is the only graceful shutdown
   // available on Windows, which has no POSIX signals.
   it("exits within seconds of a control-channel stop request", async () => {
     await startDaemonWithInFlightTurn();
 
     const start = Date.now();
-    await firstpass("daemon", "stop");
+    await m87("daemon", "stop");
     const exitedInTime = await Promise.race([
       daemon.exited.then(() => true),
       new Promise((r) => setTimeout(() => r(false), 8000)),

@@ -38,7 +38,7 @@ describe("core/projections", () => {
   let dir;
   let db;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "firstpass-proj-"));
+    dir = mkdtempSync(join(tmpdir(), "m87-proj-"));
     db = createDatabase(join(dir, "p.sqlite"));
     seedPlugin(db);
   });

@@ -65,7 +65,7 @@ describe("setup/init fullscreen wizard", () => {
     const { instance, restore, result } = startInitWizardTui({
       stdout: /** @type {any} */ (stdout),
       stdin: /** @type {any} */ (stdin),
-      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+      context: { stateDir: "/tmp/m87-state", serviceManager: "launchd" },
       initialSelections: { currentStep: "review" },
     });
 
@@ -99,7 +99,7 @@ describe("setup/init fullscreen wizard", () => {
     const { instance, restore, result } = startInitWizardTui({
       stdout: /** @type {any} */ (stdout),
       stdin: /** @type {any} */ (stdin),
-      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+      context: { stateDir: "/tmp/m87-state", serviceManager: "launchd" },
       initialSelections: { currentStep: "source", source: "github" },
     });
 
@@ -131,7 +131,7 @@ describe("setup/init fullscreen wizard", () => {
     const { instance, restore, result } = startInitWizardTui({
       stdout: /** @type {any} */ (stdout),
       stdin: /** @type {any} */ (stdin),
-      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+      context: { stateDir: "/tmp/m87-state", serviceManager: "launchd" },
       initialSelections: {
         currentStep: "source",
         source: "github",
@@ -142,7 +142,7 @@ describe("setup/init fullscreen wizard", () => {
     try {
       await sleep(50);
       await submitStep(stdin); // confirm GitHub -> enter scope config (no advance)
-      await typeText(stdin, "kunchenguid/firstpass");
+      await typeText(stdin, "kunchenguid/m87");
       await submitStep(stdin); // scope config -> review
       await submitStep(stdin); // review -> submit
 
@@ -152,7 +152,7 @@ describe("setup/init fullscreen wizard", () => {
       ]);
       expect(selections).not.toBeNull();
       expect(selections.source).toBe("github");
-      expect(selections.githubRepos).toEqual(["kunchenguid/firstpass"]);
+      expect(selections.githubRepos).toEqual(["kunchenguid/m87"]);
       expect(selections.currentStep).toBe("review");
     } finally {
       instance.unmount();
@@ -167,7 +167,7 @@ describe("setup/init fullscreen wizard", () => {
     const { instance, restore, result } = startInitWizardTui({
       stdout: /** @type {any} */ (stdout),
       stdin: /** @type {any} */ (stdin),
-      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+      context: { stateDir: "/tmp/m87-state", serviceManager: "launchd" },
     });
 
     try {
@@ -190,7 +190,7 @@ describe("setup/init fullscreen wizard", () => {
     const { instance, restore, result } = startInitWizardTui({
       stdout: /** @type {any} */ (stdout),
       stdin: /** @type {any} */ (stdin),
-      context: { stateDir: "/tmp/firstpass-state", serviceManager: "launchd" },
+      context: { stateDir: "/tmp/m87-state", serviceManager: "launchd" },
       initialSelections: {
         currentStep: "source",
         source: "github",
@@ -202,7 +202,7 @@ describe("setup/init fullscreen wizard", () => {
 
     try {
       await sleep(50);
-      await typeText(stdin, "kunchenguid/firstpass");
+      await typeText(stdin, "kunchenguid/m87");
       await submitStep(stdin);
       await submitStep(stdin);
       await submitStep(stdin);
@@ -214,7 +214,7 @@ describe("setup/init fullscreen wizard", () => {
       ]);
       expect(selections).not.toBeNull();
       expect(selections.githubScope).toBe("explicit");
-      expect(selections.githubRepos).toEqual(["kunchenguid/firstpass"]);
+      expect(selections.githubRepos).toEqual(["kunchenguid/m87"]);
     } finally {
       instance.unmount();
       await instance.waitUntilExit();

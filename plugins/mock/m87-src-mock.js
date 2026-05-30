@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// FirstPass mock source plugin - contract v2 (emit-only-events).
+// M87 mock source plugin - contract v2 (emit-only-events).
 //
 // `sync` is a pure diff: given the fingerprint baseline core hands back, it
 // emits item events (created/updated/closed) for whatever changed and returns
@@ -13,7 +13,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const PROTOCOL_VERSION = "firstpass.plugin.v2";
+const PROTOCOL_VERSION = "m87.plugin.v2";
 
 function readStdin() {
   return new Promise((resolve) => {
@@ -34,8 +34,7 @@ function readStdin() {
       if (typeof process.stdin.unref === "function") process.stdin.unref();
       resolve(data);
     };
-    const timeoutMs =
-      Number(process.env.FIRSTPASS_MOCK_STDIN_TIMEOUT_MS) || 10000;
+    const timeoutMs = Number(process.env.M87_MOCK_STDIN_TIMEOUT_MS) || 10000;
     const timer = setTimeout(finish, timeoutMs);
     if (typeof timer.unref === "function") timer.unref();
     process.stdin.on("data", (c) => (data += c));
@@ -52,7 +51,7 @@ const MANIFEST = {
     id: "mock",
     version: "2.0.0",
     display_name: "Mock Source",
-    publisher: "firstpass",
+    publisher: "m87",
   },
   item_types: [{ type: "issue", display_name: "Mock Issue" }],
   action_types: [
@@ -223,14 +222,14 @@ function handle(command, input) {
         warnings: [],
       };
     case "prepare-automation-workspace": {
-      const ws = mkdtempSync(join(tmpdir(), "firstpass-mock-ws-"));
+      const ws = mkdtempSync(join(tmpdir(), "m87-mock-ws-"));
       writeFileSync(join(ws, "README.md"), "# mock repo\n");
       return {
         protocol_version: PROTOCOL_VERSION,
         status: "prepared",
         workspace_path: ws,
         base_ref: "main",
-        branch: `firstpass/fix-${input.job?.id ?? "job"}`,
+        branch: `m87/fix-${input.job?.id ?? "job"}`,
         warnings: [],
       };
     }

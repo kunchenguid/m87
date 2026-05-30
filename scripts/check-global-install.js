@@ -16,7 +16,7 @@ const npmCommand = isWindows ? "npm.cmd" : "npm";
 // On Windows, spawning a .cmd/.bat shim without a shell throws EINVAL since the
 // CVE-2024-27980 fix in Node. execFile through the shell is required there.
 const shellOption = { shell: isWindows };
-const workDir = await mkdtemp(join(tmpdir(), "firstpass-package-check-"));
+const workDir = await mkdtemp(join(tmpdir(), "m87-package-check-"));
 
 try {
   const packResult = await execFileAsync(
@@ -43,19 +43,19 @@ try {
     },
   );
 
-  const firstpassBin = isWindows
-    ? join(prefix, "firstpass.cmd")
-    : join(prefix, "bin", "firstpass");
+  const m87Bin = isWindows
+    ? join(prefix, "m87.cmd")
+    : join(prefix, "bin", "m87");
 
   // Assert the installed bin actually RUNS (it is invoked through a symlink,
   // which a naive main-module guard silently no-ops) - not just that it exits 0.
-  const { stdout } = await execFileAsync(firstpassBin, ["--version"], {
+  const { stdout } = await execFileAsync(m87Bin, ["--version"], {
     env: { ...process.env, HOME: home },
     ...shellOption,
   });
   if (stdout.trim() !== pkg.version) {
     throw new Error(
-      `installed firstpass --version printed ${JSON.stringify(stdout)}; expected "${pkg.version}"`,
+      `installed m87 --version printed ${JSON.stringify(stdout)}; expected "${pkg.version}"`,
     );
   }
 
