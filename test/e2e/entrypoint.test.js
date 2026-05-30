@@ -13,7 +13,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = join(repoRoot, "src", "cli", "index.js");
 
 // A real `npm install -g` exposes the CLI as a bin SYMLINK
-// (…/bin/m87 -> …/node_modules/m87/dist/cli.js). When invoked that way,
+// (…/bin/m87 -> …/node_modules/@kunchenguid/m87/dist/cli.js). When invoked that way,
 // process.argv[1] is the symlink path while import.meta.url resolves to the real
 // file, so the "am I the main module?" guard must compare resolved paths or the
 // CLI silently does nothing. This guards that real-user invocation path.

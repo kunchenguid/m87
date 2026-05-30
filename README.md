@@ -11,10 +11,10 @@
       alt="Release"
       src="https://img.shields.io/github/actions/workflow/status/kunchenguid/m87/release-please.yml?style=flat-square&label=release"
   /></a>
-  <a href="https://www.npmjs.com/package/m87"
+  <a href="https://www.npmjs.com/package/@kunchenguid/m87"
     ><img
       alt="npm"
-      src="https://img.shields.io/npm/v/m87?style=flat-square"
+      src="https://img.shields.io/npm/v/@kunchenguid/m87?style=flat-square"
   /></a>
   <a href="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
     ><img
@@ -85,7 +85,7 @@ Press `i` for queue details, startup help, and other inbox info; press `i` or Es
 **npm (global)**
 
 ```sh
-npm install -g m87
+npm install -g @kunchenguid/m87
 m87 --version
 ```
 

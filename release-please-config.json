@@ -5,7 +5,8 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "m87"
+      "package-name": "@kunchenguid/m87",
+      "component": "m87"
     }
   }
 }

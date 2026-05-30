@@ -226,7 +226,7 @@ Responsibilities:
 | Runtime            | Node.js 22.13+.                                                                                 |
 | Source language    | Plain ESM JavaScript.                                                                           |
 | Typechecking       | `tsc --noEmit` with `allowJs` and `checkJs`; no JSDoc type annotations in implementation files. |
-| Package manager    | `pnpm` for development; published package works with `npm install -g m87`.                      |
+| Package manager    | `pnpm` for development; published package works with `npm install -g @kunchenguid/m87`.         |
 | CLI                | Commander for scriptable commands.                                                              |
 | Human TUI          | Ink with React, written in JS, for a screenshot-worthy terminal inbox.                          |
 | Database           | SQLite via `better-sqlite3`.                                                                    |
@@ -738,5 +738,5 @@ Phase 6: Polish and release readiness
 - [x] Add daemon status with agent target/source, plugin sync health, item counts, queue counts, and event count.
 - [x] Harden CLI structured output, errors, no-op mutation behavior, truncation, and contextual help for agent use.
 - [x] Improve TUI visual polish, empty states, loading states, error states, and screenshot-ready demo fixtures.
-- [x] Add package publishing checks for `npm install -g m87` on supported Node and OS targets.
+- [x] Add package publishing checks for `npm install -g @kunchenguid/m87` on supported Node and OS targets.
 - [x] Add release documentation covering install, setup, plugin trust, credentials, retention, ACP targets, and first GitHub workflow.

@@ -1655,7 +1655,7 @@ program
     if (compareSemver(current, latest) >= 0) {
       return out({ status: "up_to_date", current, latest });
     }
-    const command = `npm install -g m87@${latest}`;
+    const command = `npm install -g @kunchenguid/m87@${latest}`;
     if (options.check || isUpdateDryRun()) {
       return out({
         status: "update_available",

@@ -11,7 +11,7 @@ The package exposes the `m87` binary.
 For a published release, install it globally:
 
 ```sh
-npm install -g m87
+npm install -g @kunchenguid/m87
 ```
 
 Verify the installed binary:
@@ -197,7 +197,7 @@ pnpm test
 After publishing, verify a fresh global install on each supported Node and OS target:
 
 ```sh
-npm install -g m87
+npm install -g @kunchenguid/m87
 m87 --version
 m87 init --yes --plugin skip --no-install-service
 m87 status

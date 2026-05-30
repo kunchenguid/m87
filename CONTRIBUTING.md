@@ -38,7 +38,7 @@ node src/cli/index.js   # run the CLI straight from source (no build needed)
 ```
 
 Running from source always reflects your latest edits.
-The global `m87` binary is a built snapshot, so reinstall it (`npm pack` then `npm install -g ./m87-<version>.tgz`) only when you want to exercise the packaged install.
+The global `m87` binary is a built snapshot, so reinstall it (`npm pack` then `npm install -g ./kunchenguid-m87-<version>.tgz`) only when you want to exercise the packaged install.
 
 ## Repo conventions
 

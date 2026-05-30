@@ -22,7 +22,9 @@ export async function fetchLatestVersion() {
   const registry = (
     process.env.M87_REGISTRY_URL || "https://registry.npmjs.org"
   ).replace(/\/$/, "");
-  const response = await globalThis.fetch(`${registry}/m87/latest`);
+  const response = await globalThis.fetch(
+    `${registry}/@kunchenguid/m87/latest`,
+  );
   if (!response.ok) {
     throw new Error(`registry responded ${response.status}`);
   }
