@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/kunchenguid/m87/compare/m87-v0.1.3...m87-v0.1.4) (2026-05-30)
+
+
+### Bug Fixes
+
+* add repository metadata for npm provenance publishing ([#16](https://github.com/kunchenguid/m87/issues/16)) ([6041ed3](https://github.com/kunchenguid/m87/commit/6041ed3105658e4347b58dfddeced8f53d889ad4))
+
 ## [0.1.3](https://github.com/kunchenguid/m87/compare/m87-v0.1.2...m87-v0.1.3) (2026-05-30)
 
 
