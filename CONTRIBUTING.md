@@ -29,7 +29,7 @@ See the [no-mistakes quick start](https://kunchenguid.github.io/no-mistakes/star
 
 ## Local development
 
-`m87` is an ESM-only Node project (Node 20+) using the pnpm version pinned in `packageManager`.
+`m87` is an ESM-only Node project (Node.js 22.13+) using the pnpm version pinned in `packageManager`.
 
 ```sh
 pnpm install
