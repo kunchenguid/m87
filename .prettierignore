@@ -5,3 +5,4 @@ dist/
 coverage/
 *.tgz
 CHANGELOG.md
+.agents/skills/no-mistakes/SKILL.md
