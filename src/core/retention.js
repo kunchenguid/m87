@@ -245,6 +245,7 @@ function redactAuditEvents(db, cutoff) {
     const skeleton = { redacted: true };
     for (const key of [
       "type",
+      "action_result_id",
       "action_id",
       "approval_id",
       "action_type",

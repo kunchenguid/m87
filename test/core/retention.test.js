@@ -318,6 +318,36 @@ describe("core/retention", () => {
     expect(fresh.result).toEqual({ url: "u" });
   });
 
+  it("preserves action result ids in redacted action events", () => {
+    insertActionResult(db, { id: "ar-old", completedAt: daysAgo(400) });
+    insertEvent(db, {
+      id: "ev-act-old-id",
+      entity: "action",
+      lifecycle: "closed",
+      createdAt: daysAgo(400),
+      payload: {
+        type: "executed",
+        action_result_id: "ar-old",
+        status: "succeeded",
+        result: { url: "mock://comment/1" },
+      },
+    });
+
+    const counts = sweepRetention(db, { now: NOW });
+    expect(counts.audit_events).toBe(1);
+
+    const old = JSON.parse(
+      db.prepare("select payload_json from events where id='ev-act-old-id'").get()
+        .payload_json,
+    );
+    expect(old).toEqual({
+      redacted: true,
+      type: "executed",
+      action_result_id: "ar-old",
+      status: "succeeded",
+    });
+  });
+
   it("keeps queued action event payloads until processing completes", () => {
     db.prepare("update retention_policies set audit_ttl='never'").run();
     insertEvent(db, {
