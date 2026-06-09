@@ -1129,12 +1129,21 @@ program
       )
       .get(id);
     db.close();
+    let contextJson = null;
+    if (ctx) {
+      contextJson =
+        ctx.agent_context_json !== "null"
+          ? ctx.agent_context_json
+          : ctx.human_context_json !== "null"
+            ? ctx.human_context_json
+            : null;
+    }
     const handoff = [
       `Item: ${item.title}`,
       `Source: ${item.url}`,
       `Why it surfaced: ${item.attention_reason}`,
-      ctx
-        ? `Context: ${ctx.agent_context_json}`
+      contextJson
+        ? `Context: ${contextJson}`
         : "Context: (none stored; run `m87 triage`)",
     ].join("\n");
     out({ status: "found", item_id: id, handoff_prompt: handoff });

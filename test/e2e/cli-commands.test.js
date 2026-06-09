@@ -152,6 +152,22 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
     expect(after.handoff_prompt).toContain("none stored");
   });
 
+  it("copy-handoff keeps rendered context after raw context cleanup", async () => {
+    await waitFor(async () => {
+      const h = parse(await m87("copy-handoff", "mock:issue-1")).handoff_prompt;
+      return h.includes("none stored") ? null : h;
+    });
+
+    await m87("retention", "set", "raw_context_ttl", "never");
+    await m87("retention", "set", "prompt_ttl", "keep");
+    const cleaned = parse(await m87("retention", "cleanup"));
+    expect(cleaned.raw_contexts).toBeGreaterThanOrEqual(1);
+
+    const after = parse(await m87("copy-handoff", "mock:issue-1"));
+    expect(after.handoff_prompt).toContain("Mock context for issue-1");
+    expect(after.handoff_prompt).not.toContain("Context: null");
+  });
+
   it("mutating commands refuse when the daemon is down", async () => {
     await daemon.stop();
     daemon = undefined;
