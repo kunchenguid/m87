@@ -341,8 +341,9 @@ describe("core/retention", () => {
     expect(counts.audit_events).toBe(0);
 
     const payload = JSON.parse(
-      db.prepare("select payload_json from events where id='ev-act-pending'").get()
-        .payload_json,
+      db
+        .prepare("select payload_json from events where id='ev-act-pending'")
+        .get().payload_json,
     );
     expect(payload.request.action.params.body).toBe("outgoing text");
   });
@@ -418,6 +419,70 @@ describe("core/retention", () => {
         .payload_json,
     );
     expect(liveEvent.options[0].actions[0].params.body).toBe("draft text");
+  });
+
+  it("rolls back projection purges when event redaction fails", () => {
+    insertContext(db, { id: "ctx-old", createdAt: daysAgo(40) });
+    insertRecommendation(db, { id: "rec-done", supersededAt: daysAgo(35) });
+    db.prepare(
+      `insert into recommendation_options
+         (id, recommendation_id, position, title, rationale, evidence_refs_json,
+          confidence, waiting_on, actions_json, automation_json, created_at)
+       values (?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      "rec-done-opt-0",
+      "rec-done",
+      0,
+      "Reply",
+      "ack",
+      "[]",
+      "high",
+      "user",
+      '[{"id":"a1","params":{"body":"draft text"}}]',
+      '{"kind":"code_fix","prompt":"fix it"}',
+      daysAgo(40),
+    );
+    insertEvent(db, {
+      id: "ev-rec-done",
+      entity: "recommendation",
+      lifecycle: "created",
+      createdAt: daysAgo(40),
+      payload: {
+        type: "triage_result",
+        recommendation_id: "rec-done",
+        options: [
+          {
+            id: "rec-done-opt-0",
+            actions: [{ id: "a1", params: { body: "draft text" } }],
+            automation: { kind: "code_fix", prompt: "fix it" },
+          },
+        ],
+      },
+    });
+    db.prepare(
+      `create trigger fail_event_redaction
+         before update of payload_json on events
+         begin
+           select raise(abort, 'event redaction failed');
+         end`,
+    ).run();
+
+    expect(() => sweepRetention(db, { now: NOW })).toThrow(
+      /event redaction failed/,
+    );
+
+    const ctx = db
+      .prepare("select * from prompt_contexts where id='ctx-old'")
+      .get();
+    expect(ctx.deleted_at).toBeNull();
+    expect(ctx.human_context_json).toBe('{"summary":"human"}');
+    expect(ctx.agent_context_json).toBe('{"thread":"raw source text"}');
+
+    const option = db
+      .prepare("select * from recommendation_options where id='rec-done-opt-0'")
+      .get();
+    expect(option.actions_json).toContain("draft text");
+    expect(option.automation_json).toContain("fix it");
   });
 
   it("removes attachment files past attachment_ttl, keeping fresh ones", () => {

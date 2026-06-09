@@ -115,70 +115,94 @@ export function sweepRetention(db, { stateDir = null, now = new Date() } = {}) {
     audit_events: 0,
   };
 
-  // Raw-ish fetched source context: the agent_context column is the closest
-  // thing to raw source content we hold, so it goes first; the rendered
-  // human context and evidence catalog survive until prompt_ttl.
-  const rawCutoff = cutoffFor(policy.raw_context_ttl, now);
-  if (rawCutoff) {
-    counts.raw_contexts = db
-      .prepare(
-        `update prompt_contexts set agent_context_json='null'
-          where deleted_at is null
-            and agent_context_json != 'null'
-            and created_at <= ?`,
-      )
-      .run(rawCutoff).changes;
-  }
+  const applyDatabaseRetention = db.transaction(() => {
+    // Raw-ish fetched source context: the agent_context column is the closest
+    // thing to raw source content we hold, so it goes first; the rendered
+    // human context and evidence catalog survive until prompt_ttl.
+    const rawCutoff = cutoffFor(policy.raw_context_ttl, now);
+    if (rawCutoff) {
+      counts.raw_contexts = db
+        .prepare(
+          `update prompt_contexts set agent_context_json='null'
+            where deleted_at is null
+              and agent_context_json != 'null'
+              and created_at <= ?`,
+        )
+        .run(rawCutoff).changes;
+    }
 
-  // Prompt contexts: a per-row expires_at (stamped at write time) is always
-  // honored, even if the policy was later relaxed - the row was stored under
-  // the stricter promise. The purge blanks content; the row stays as a
-  // tombstone so history still shows a context existed.
-  const promptCutoff = cutoffFor(policy.prompt_ttl, now);
-  const expiry = promptCutoff
-    ? "((expires_at is not null and expires_at <= ?) or created_at <= ?)"
-    : "(expires_at is not null and expires_at <= ?)";
-  counts.prompt_contexts = db
-    .prepare(
-      `update prompt_contexts
-          set deleted_at=?, human_context_json='null', agent_context_json='null',
-              evidence_json='null', redaction_hints_json='null'
-        where deleted_at is null and ${expiry}`,
-    )
-    .run(
-      ...(promptCutoff ? [nowIso, nowIso, promptCutoff] : [nowIso, nowIso]),
-    ).changes;
+    // Prompt contexts: a per-row expires_at (stamped at write time) is always
+    // honored, even if the policy was later relaxed - the row was stored under
+    // the stricter promise. The purge blanks content; the row stays as a
+    // tombstone so history still shows a context existed.
+    const promptCutoff = cutoffFor(policy.prompt_ttl, now);
+    const expiry = promptCutoff
+      ? "((expires_at is not null and expires_at <= ?) or created_at <= ?)"
+      : "(expires_at is not null and expires_at <= ?)";
+    counts.prompt_contexts = db
+      .prepare(
+        `update prompt_contexts
+            set deleted_at=?, human_context_json='null', agent_context_json='null',
+                evidence_json='null', redaction_hints_json='null'
+          where deleted_at is null and ${expiry}`,
+      )
+      .run(
+        ...(promptCutoff ? [nowIso, nowIso, promptCutoff] : [nowIso, nowIso]),
+      ).changes;
 
-  // Drafts: unapproved outgoing payloads on recommendations that are no
-  // longer active - action previews, the proposed action params and
-  // automation prompts on recommendation options, and the same bodies inside
-  // the recommendation.created event. Titles, rationale, and evidence refs
-  // stay: they are recommendation history, not drafts. The approved payload
-  // survives in approvals, which the PRD keeps as audit.
-  const draftCutoff = cutoffFor(policy.draft_ttl, now);
-  if (draftCutoff) {
-    counts.drafts = db
-      .prepare(
-        `delete from action_previews
-          where created_at <= ?
-            and not exists (select 1 from recommendations r
-                             where r.id = action_previews.recommendation_id
-                               and (r.superseded_at is null or r.superseded_at > ?))`,
-      )
-      .run(draftCutoff, draftCutoff).changes;
-    counts.draft_options = db
-      .prepare(
-        `update recommendation_options
-            set actions_json='[]', automation_json=null
-          where (actions_json != '[]' or automation_json is not null)
-            and created_at <= ?
-            and recommendation_id in (select id from recommendations
-                                       where superseded_at is not null
-                                         and superseded_at <= ?)`,
-      )
-      .run(draftCutoff, draftCutoff).changes;
-    redactDraftEvents(db, draftCutoff);
-  }
+    // Drafts: unapproved outgoing payloads on recommendations that are no
+    // longer active - action previews, the proposed action params and
+    // automation prompts on recommendation options, and the same bodies inside
+    // the recommendation.created event. Titles, rationale, and evidence refs
+    // stay: they are recommendation history, not drafts. The approved payload
+    // survives in approvals, which the PRD keeps as audit.
+    const draftCutoff = cutoffFor(policy.draft_ttl, now);
+    if (draftCutoff) {
+      counts.drafts = db
+        .prepare(
+          `delete from action_previews
+            where created_at <= ?
+              and not exists (select 1 from recommendations r
+                               where r.id = action_previews.recommendation_id
+                                 and (r.superseded_at is null or r.superseded_at > ?))`,
+        )
+        .run(draftCutoff, draftCutoff).changes;
+      counts.draft_options = db
+        .prepare(
+          `update recommendation_options
+              set actions_json='[]', automation_json=null
+            where (actions_json != '[]' or automation_json is not null)
+              and created_at <= ?
+              and recommendation_id in (select id from recommendations
+                                         where superseded_at is not null
+                                           and superseded_at <= ?)`,
+        )
+        .run(draftCutoff, draftCutoff).changes;
+      redactDraftEvents(db, draftCutoff);
+    }
+
+    // Audit payload compaction: keep who/what/when (ids, status, timestamps,
+    // errors) forever, drop the bulky request/result payloads after audit_ttl -
+    // both in the action_results projection and in the action events that
+    // would replay into it.
+    const auditCutoff = cutoffFor(policy.audit_ttl, now);
+    if (auditCutoff) {
+      counts.audit_payloads = db
+        .prepare(
+          `update action_results
+              set validation_json=null, preview_json=null, result_json=null,
+                  request_json='{}'
+            where completed_at is not null
+              and completed_at <= ?
+              and (request_json != '{}' or validation_json is not null
+                   or preview_json is not null or result_json is not null)`,
+        )
+        .run(auditCutoff).changes;
+      counts.audit_events = redactAuditEvents(db, auditCutoff);
+    }
+  });
+
+  applyDatabaseRetention();
 
   // Attachments: the core never copies attachment blobs into the database;
   // anything cached under <stateDir>/attachments is subject to this TTL.
@@ -188,26 +212,6 @@ export function sweepRetention(db, { stateDir = null, now = new Date() } = {}) {
       join(stateDir, "attachments"),
       Date.parse(attachmentCutoff),
     );
-  }
-
-  // Audit payload compaction: keep who/what/when (ids, status, timestamps,
-  // errors) forever, drop the bulky request/result payloads after audit_ttl -
-  // both in the action_results projection and in the action events that
-  // would replay into it.
-  const auditCutoff = cutoffFor(policy.audit_ttl, now);
-  if (auditCutoff) {
-    counts.audit_payloads = db
-      .prepare(
-        `update action_results
-            set validation_json=null, preview_json=null, result_json=null,
-                request_json='{}'
-          where completed_at is not null
-            and completed_at <= ?
-            and (request_json != '{}' or validation_json is not null
-                 or preview_json is not null or result_json is not null)`,
-      )
-      .run(auditCutoff).changes;
-    counts.audit_events = redactAuditEvents(db, auditCutoff);
   }
 
   return counts;
@@ -235,30 +239,27 @@ function redactAuditEvents(db, cutoff) {
     .all(cutoff);
   const update = db.prepare("update events set payload_json=? where id=?");
   let redacted = 0;
-  const apply = db.transaction(() => {
-    for (const row of rows) {
-      const p = safeParse(row.payload_json);
-      if (!p || p.redacted) continue;
-      const skeleton = { redacted: true };
-      for (const key of [
-        "type",
-        "action_id",
-        "approval_id",
-        "action_type",
-        "required",
-        "depends_on",
-        "safety",
-        "plugin_id",
-        "status",
-        "error",
-      ]) {
-        if (p[key] !== undefined) skeleton[key] = p[key];
-      }
-      update.run(JSON.stringify(skeleton), row.id);
-      redacted += 1;
+  for (const row of rows) {
+    const p = safeParse(row.payload_json);
+    if (!p || p.redacted) continue;
+    const skeleton = { redacted: true };
+    for (const key of [
+      "type",
+      "action_id",
+      "approval_id",
+      "action_type",
+      "required",
+      "depends_on",
+      "safety",
+      "plugin_id",
+      "status",
+      "error",
+    ]) {
+      if (p[key] !== undefined) skeleton[key] = p[key];
     }
-  });
-  apply();
+    update.run(JSON.stringify(skeleton), row.id);
+    redacted += 1;
+  }
   return redacted;
 }
 
@@ -279,20 +280,17 @@ function redactDraftEvents(db, cutoff) {
     )
     .all(cutoff, cutoff);
   const update = db.prepare("update events set payload_json=? where id=?");
-  const apply = db.transaction(() => {
-    for (const row of rows) {
-      const p = safeParse(row.payload_json);
-      if (!p || p.drafts_redacted) continue;
-      p.options = (p.options ?? []).map((o) => ({
-        ...o,
-        actions: [],
-        automation: null,
-      }));
-      p.drafts_redacted = true;
-      update.run(JSON.stringify(p), row.id);
-    }
-  });
-  apply();
+  for (const row of rows) {
+    const p = safeParse(row.payload_json);
+    if (!p || p.drafts_redacted) continue;
+    p.options = (p.options ?? []).map((o) => ({
+      ...o,
+      actions: [],
+      automation: null,
+    }));
+    p.drafts_redacted = true;
+    update.run(JSON.stringify(p), row.id);
+  }
 }
 
 function safeParse(json) {
