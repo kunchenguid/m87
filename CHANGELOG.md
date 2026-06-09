@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.5](https://github.com/kunchenguid/m87/compare/m87-v0.1.4...m87-v0.1.5) (2026-06-09)
+
+
+### Features
+
+* **core:** enforce retention cleanup policies ([#18](https://github.com/kunchenguid/m87/issues/18)) ([ed349e6](https://github.com/kunchenguid/m87/commit/ed349e6fbb926d54d56968b1615c5deba52735b7))
+
+
+### Bug Fixes
+
+* ci pipeline failure ([a772e87](https://github.com/kunchenguid/m87/commit/a772e87ca2130459063dd7221d2506d147bb7ab4))
+
 ## [0.1.4](https://github.com/kunchenguid/m87/compare/m87-v0.1.3...m87-v0.1.4) (2026-05-30)
 
 
