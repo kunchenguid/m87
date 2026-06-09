@@ -121,6 +121,53 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
     expect(after).not.toBe(before);
   });
 
+  it("retention policy, set, and cleanup purge stored prompt contexts", async () => {
+    // triage stored the fetched context, so the handoff carries real context
+    await waitFor(async () => {
+      const h = parse(await m87("copy-handoff", "mock:issue-1")).handoff_prompt;
+      return h.includes("none stored") ? null : h;
+    });
+
+    const shown = parse(await m87("retention", "policy")).policy;
+    expect(shown.prompt_ttl).toBe("30d");
+    expect(shown.audit_ttl).toBe("365d");
+
+    const badField = await m87("retention", "set", "nope_ttl", "30d").catch(
+      (e) => e,
+    );
+    expect(badField.stderr).toContain("unknown retention field");
+    const badTtl = await m87("retention", "set", "prompt_ttl", "soon").catch(
+      (e) => e,
+    );
+    expect(badTtl.stderr).toContain("invalid ttl");
+
+    const updated = parse(await m87("retention", "set", "prompt_ttl", "never"));
+    expect(updated.policy.prompt_ttl).toBe("never");
+
+    const cleaned = parse(await m87("retention", "cleanup"));
+    expect(cleaned.status).toBe("cleaned");
+    expect(cleaned.prompt_contexts).toBeGreaterThanOrEqual(1);
+
+    const after = parse(await m87("copy-handoff", "mock:issue-1"));
+    expect(after.handoff_prompt).toContain("none stored");
+  });
+
+  it("copy-handoff keeps rendered context after raw context cleanup", async () => {
+    await waitFor(async () => {
+      const h = parse(await m87("copy-handoff", "mock:issue-1")).handoff_prompt;
+      return h.includes("none stored") ? null : h;
+    });
+
+    await m87("retention", "set", "raw_context_ttl", "never");
+    await m87("retention", "set", "prompt_ttl", "keep");
+    const cleaned = parse(await m87("retention", "cleanup"));
+    expect(cleaned.raw_contexts).toBeGreaterThanOrEqual(1);
+
+    const after = parse(await m87("copy-handoff", "mock:issue-1"));
+    expect(after.handoff_prompt).toContain("Mock context for issue-1");
+    expect(after.handoff_prompt).not.toContain("Context: null");
+  });
+
   it("mutating commands refuse when the daemon is down", async () => {
     await daemon.stop();
     daemon = undefined;

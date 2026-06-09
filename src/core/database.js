@@ -15,7 +15,11 @@ const SCHEMA_VERSION = 1;
 
 const schema = `
 -- 1. THE IMMUTABLE LOG ------------------------------------------------------
--- Append-only. Never UPDATE, never DELETE. item_id / parent_event_id are
+-- Append-only. Never UPDATE, never DELETE. One carve-out: the retention
+-- sweep (core/retention.js) may REDACT payload_json bodies in place once
+-- their TTL passes - rows, ids, timestamps, and causal links are never
+-- touched, and redacted events replay into the same compacted projections.
+-- item_id / parent_event_id are
 -- denormalized indexes into the log, NOT foreign keys: an event is appended
 -- before its projection (the item row) exists, so a hard FK would deadlock
 -- ordering. The log is primary; projections are derived.

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { runAcpTurn } from "../agent/acp.js";
 import { noopLogger } from "../core/log.js";
+import { promptContextRetention } from "../core/retention.js";
 import { syncRetryDelayMs } from "../core/scheduler.js";
 import {
   buildFixPrompt,
@@ -189,6 +190,30 @@ export function createEffects(ctx) {
       0,
       startedAt,
     );
+    // Persist what the agent saw so old recommendations stay inspectable
+    // (view/copy-handoff) without re-fetching. The retention policy decides
+    // whether it is stored at all and when the sweep purges it.
+    const retention = promptContextRetention(db);
+    const contextId = `ctx-${agentRunId}`;
+    if (retention.store) {
+      db.prepare(
+        `insert into prompt_contexts
+           (id, item_id, recommendation_id, retention_class, human_context_json,
+            agent_context_json, evidence_json, redaction_hints_json, created_at, expires_at)
+         values (?,?,?,?,?,?,?,?,?,?)`,
+      ).run(
+        contextId,
+        item.id,
+        null,
+        "prompt",
+        JSON.stringify(context.human_context ?? {}),
+        JSON.stringify(context.agent_context ?? {}),
+        JSON.stringify(context.evidence ?? []),
+        JSON.stringify(context.redaction_hints ?? []),
+        startedAt,
+        retention.expires_at,
+      );
+    }
     try {
       const { response, usage } = await runAcpTurn({
         agentSpec,
@@ -203,6 +228,9 @@ export function createEffects(ctx) {
         throw new Error("agent returned no usable recommendation");
       }
       const recId = `rec-${agentRunId}`;
+      db.prepare(
+        "update prompt_contexts set recommendation_id=? where id=?",
+      ).run(recId, contextId);
       db.prepare(
         "update agent_runs set recommendation_id=?, status='completed', tokens_in=?, tokens_out=?, completed_at=? where id=?",
       ).run(

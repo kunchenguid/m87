@@ -170,6 +170,13 @@ describe("e2e: m87 CLI with a real daemon (sole consumer)", () => {
       expect(job.status).toBe("succeeded");
       expect(JSON.parse(job.metadata_json).pr_url).toContain("mock://pull/");
 
+      // triage persisted the prompt context under the retention policy
+      const ctx = db.prepare("select * from prompt_contexts").get();
+      expect(ctx.retention_class).toBe("prompt");
+      expect(ctx.recommendation_id).toBe(recId);
+      expect(ctx.expires_at).not.toBeNull();
+      expect(ctx.agent_context_json).not.toBe("null");
+
       const root = db
         .prepare(
           "select id from events where entity='item' and lifecycle='created'",

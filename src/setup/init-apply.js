@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { createDatabase } from "../core/database.js";
+import { seedRetentionPolicy } from "../core/retention.js";
 import { pluginConfigure, readManifest } from "../host/plugin.js";
 import { getServicePlan, isServiceDryRun } from "../cli/service.js";
 import {
@@ -12,18 +13,6 @@ import {
   loadConfig,
   saveConfig,
 } from "../cli/state.js";
-
-export function seedRetentionPolicy(db) {
-  const exists = db
-    .prepare("select id from retention_policies where id='retention-default'")
-    .get();
-  if (exists) return;
-  const now = new Date().toISOString();
-  db.prepare(
-    `insert into retention_policies (id, scope, raw_context_ttl, prompt_ttl, draft_ttl, attachment_ttl, audit_ttl, created_at, updated_at)
-     values ('retention-default','global','7d','30d','30d','7d','365d',?,?)`,
-  ).run(now, now);
-}
 
 export function initializeCoreState(configPatch = {}) {
   const stateDir = ensureStateDir();

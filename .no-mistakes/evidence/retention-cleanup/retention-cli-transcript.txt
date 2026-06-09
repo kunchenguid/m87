@@ -1,0 +1,102 @@
+$ m87 init
+status: initialized
+state_dir: .m87t-state
+
+$ m87 plugin add mock
+status: installed
+plugin:
+  id: mock
+  version: 2.0.0
+  display_name: Mock Source
+  publisher: m87
+
+$ m87 sync
+status: synced
+items: 1
+recommendations: 0
+
+$ m87 copy-handoff mock:issue-1
+status: found
+item_id: mock:issue-1
+handoff_prompt: |-
+  Item: Crash on empty config
+  Source: mock://issue/1
+  Why it surfaced: You are assigned
+  Context: {"issue":"issue-1","body":"App crashes when config is empty."}
+
+$ m87 retention policy
+policy:
+  raw_context_ttl: 7d
+  prompt_ttl: 30d
+  draft_ttl: 30d
+  attachment_ttl: 7d
+  audit_ttl: 365d
+  updated_at: '2026-06-09T21:13:44.844Z'
+
+$ m87 retention set raw_context_ttl never
+status: updated
+policy:
+  raw_context_ttl: never
+  prompt_ttl: 30d
+  draft_ttl: 30d
+  attachment_ttl: 7d
+  audit_ttl: 365d
+  updated_at: '2026-06-09T21:13:53.516Z'
+
+$ m87 retention set prompt_ttl keep
+status: updated
+policy:
+  raw_context_ttl: never
+  prompt_ttl: keep
+  draft_ttl: 30d
+  attachment_ttl: 7d
+  audit_ttl: 365d
+  updated_at: '2026-06-09T21:13:53.591Z'
+
+$ m87 retention cleanup
+status: cleaned
+raw_contexts: 1
+prompt_contexts: 0
+drafts: 0
+draft_options: 0
+attachments: 0
+audit_payloads: 0
+audit_events: 0
+
+$ m87 copy-handoff mock:issue-1
+status: found
+item_id: mock:issue-1
+handoff_prompt: |-
+  Item: Crash on empty config
+  Source: mock://issue/1
+  Why it surfaced: You are assigned
+  Context: {"summary":"Mock context for issue-1"}
+
+$ m87 retention set prompt_ttl never
+status: updated
+policy:
+  raw_context_ttl: never
+  prompt_ttl: never
+  draft_ttl: 30d
+  attachment_ttl: 7d
+  audit_ttl: 365d
+  updated_at: '2026-06-09T21:13:53.819Z'
+
+$ m87 retention cleanup
+status: cleaned
+raw_contexts: 0
+prompt_contexts: 1
+drafts: 0
+draft_options: 0
+attachments: 0
+audit_payloads: 0
+audit_events: 0
+
+$ m87 copy-handoff mock:issue-1
+status: found
+item_id: mock:issue-1
+handoff_prompt: |-
+  Item: Crash on empty config
+  Source: mock://issue/1
+  Why it surfaced: You are assigned
+  Context: (none stored; run `m87 triage`)
