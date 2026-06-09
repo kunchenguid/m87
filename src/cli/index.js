@@ -32,6 +32,13 @@ import {
 import { createControlServer, sendControl } from "../core/control.js";
 import { createDatabase } from "../core/database.js";
 import { makeEvent } from "../core/event.js";
+import {
+  RETENTION_FIELDS,
+  loadRetentionPolicy,
+  parseTtl,
+  seedRetentionPolicy,
+  sweepRetention,
+} from "../core/retention.js";
 import { createLogger } from "../core/log.js";
 import { deadLetterCount, enqueue, pendingCount } from "../core/queue.js";
 import { selectPluginsDueForSync } from "../core/scheduler.js";
@@ -1258,22 +1265,64 @@ audit
   });
 
 // --- retention -------------------------------------------------------------
-program
+const policyView = (policy) => ({
+  raw_context_ttl: policy.raw_context_ttl,
+  prompt_ttl: policy.prompt_ttl,
+  draft_ttl: policy.draft_ttl,
+  attachment_ttl: policy.attachment_ttl,
+  audit_ttl: policy.audit_ttl,
+  updated_at: policy.updated_at,
+});
+const retention = program
   .command("retention")
-  .description("Manage retention")
-  .command("cleanup")
-  .description("Delete expired prompt contexts")
+  .description("Retention policy and cleanup");
+retention
+  .command("policy")
+  .description("Show the retention policy")
   .action(() => {
     const { dbPath } = getStatePaths();
     const db = createDatabase(dbPath);
-    const now = new Date().toISOString();
-    const info = db
-      .prepare(
-        "update prompt_contexts set deleted_at=? where expires_at is not null and expires_at <= ? and deleted_at is null",
-      )
-      .run(now, now);
+    seedRetentionPolicy(db);
+    const policy = loadRetentionPolicy(db);
     db.close();
-    out({ status: "cleaned", deleted: info.changes });
+    out({ policy: policyView(policy) });
+  });
+retention
+  .command("set <field> <ttl>")
+  .description(
+    `Set a retention TTL (${RETENTION_FIELDS.join("|")}) to a duration like 30d or 12h, or keep, or never`,
+  )
+  .action((field, ttl) => {
+    if (!RETENTION_FIELDS.includes(field)) {
+      return failUsage(
+        `unknown retention field: ${field} (one of ${RETENTION_FIELDS.join(", ")})`,
+      );
+    }
+    try {
+      parseTtl(ttl);
+    } catch (err) {
+      return failUsage(err.message);
+    }
+    const { dbPath } = getStatePaths();
+    const db = createDatabase(dbPath);
+    seedRetentionPolicy(db);
+    db.prepare(
+      `update retention_policies set ${field}=?, updated_at=? where id='retention-default'`,
+    ).run(ttl.trim().toLowerCase(), new Date().toISOString());
+    const policy = loadRetentionPolicy(db);
+    db.close();
+    out({ status: "updated", policy: policyView(policy) });
+  });
+retention
+  .command("cleanup")
+  .description("Apply the retention policy now (purge expired data)")
+  .action(() => {
+    const { dbPath, stateDir } = getStatePaths();
+    const db = createDatabase(dbPath);
+    seedRetentionPolicy(db);
+    const counts = sweepRetention(db, { stateDir });
+    db.close();
+    out({ status: "cleaned", ...counts });
   });
 
 // --- state -----------------------------------------------------------------
@@ -1418,6 +1467,7 @@ daemon
       poll_interval: runtime.config.poll_interval ?? 300,
     });
     let lastSync = 0;
+    let lastSweep = 0;
     try {
       await runtime.loop.runForever({
         signal: controller.signal,
@@ -1428,7 +1478,12 @@ daemon
             lastSync = Date.now();
             await scheduleSync(runtime);
           }
-          sweepTtl(runtime.db); // the scheduler owns retention sweeps (plan §4)
+          // The scheduler owns retention sweeps (plan §4). Hourly is plenty:
+          // every TTL is measured in days.
+          if (Date.now() - lastSweep >= 3_600_000) {
+            lastSweep = Date.now();
+            sweepRetention(runtime.db, { stateDir: runtime.stateDir });
+          }
         },
       });
     } finally {
@@ -1459,13 +1514,6 @@ function cleanupPid(pidPath) {
   } catch {
     // best-effort
   }
-}
-
-function sweepTtl(db) {
-  const now = new Date().toISOString();
-  db.prepare(
-    "update prompt_contexts set deleted_at=? where expires_at is not null and expires_at <= ? and deleted_at is null",
-  ).run(now, now);
 }
 
 async function scheduleSync(runtime) {

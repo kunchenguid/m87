@@ -105,12 +105,26 @@ If write credentials are optional, start with read-only credentials and enable w
 
 ## Retention
 
-Retention cleanup currently expires prompt context rows that have passed their TTL.
-Broader cleanup for raw source context, rendered context, drafts, attachments, and audit policy controls remains future work.
+A single global retention policy controls how long each class of locally stored data is kept.
+The daemon applies it automatically about once an hour.
 
-Run retention cleanup before destructive maintenance when needed:
+| Setting           | Default | What it covers                                                                                                             |
+| ----------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `raw_context_ttl` | `7d`    | Raw-ish source content fetched for triage (the agent-facing context). Purged first; rendered context stays longer.         |
+| `prompt_ttl`      | `30d`   | The full stored prompt context (rendered human context, evidence, redaction hints). Purged rows remain as tombstones.      |
+| `draft_ttl`       | `30d`   | Unapproved draft payloads on superseded recommendations: action previews, proposed action params, and automation prompts.  |
+| `attachment_ttl`  | `7d`    | Files cached under the state directory's `attachments/` folder. M87 never copies attachment blobs into its database.       |
+| `audit_ttl`       | `365d`  | Bulky action request/result payloads. The audit skeleton (ids, status, timestamps, errors) and approvals are kept forever. |
+
+Each TTL is a duration (`30d`, `12h`), `keep` (retain forever), or `never` (do not retain; purged at the next sweep).
+Event rows, approvals, and recommendation history (titles, rationale, evidence) are never deleted by retention - they are the audit trail.
+Expired draft and audit payload bodies are also redacted inside the event log itself, so purged data does not survive a replay.
+
+Inspect or change the policy, and apply it immediately when needed:
 
 ```sh
+m87 retention policy
+m87 retention set prompt_ttl 14d
 m87 retention cleanup
 ```
 
