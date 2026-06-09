@@ -134,30 +134,32 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 
 ## CLI Reference
 
-| Command                    | Description                                                  |
-| -------------------------- | ------------------------------------------------------------ |
-| `m87 init`                 | Open guided setup on a TTY, or initialize local state        |
-| `m87 status`               | Show resolved agent, plugins, queue, and inbox status        |
-| `m87 sync`                 | Nudge the daemon to sync + triage all active plugins now     |
-| `m87 list`                 | List the active review inbox                                 |
-| `m87 view <item>`          | Show one item and its recommendation detail                  |
-| `m87 open <item>`          | Print the item's source URL                                  |
-| `m87 copy-handoff <item>`  | Print a copyable agent handoff prompt for one item           |
-| `m87 preview <rec>`        | Preview what approving an option would do (the gate)         |
-| `m87 approve <rec>`        | Approve an option - the one human gate                       |
-| `m87 triage <item>`        | Triage one newly synced item                                 |
-| `m87 rerun <item>`         | Supersede the recommendation and re-triage an item           |
-| `m87 dismiss <item>`       | Dismiss an item                                              |
-| `m87 mark-handled <item>`  | Mark an item handled                                         |
-| `m87 snooze <item> <dur>`  | Snooze an item until later (e.g. `1d`, `4h`)                 |
-| `m87 plugin ...`           | `add`, `list`, `configure`, `sync`, `doctor` source plugins  |
-| `m87 job ...`              | `list`, `view`, `attach` automation jobs                     |
-| `m87 daemon ...`           | `start`, `stop`, `status`, `restart`, `install`, `uninstall` |
-| `m87 audit export`         | Export the action audit trail                                |
-| `m87 audit receipt <id>`   | Show a receipt for an approval                               |
-| `m87 state export\|import` | Portable, secret-redacted state export/import                |
-| `m87 retention cleanup`    | Delete expired prompt contexts                               |
-| `m87 update [--check]`     | Check for and install a newer release from npm               |
+| Command                           | Description                                                  |
+| --------------------------------- | ------------------------------------------------------------ |
+| `m87 init`                        | Open guided setup on a TTY, or initialize local state        |
+| `m87 status`                      | Show resolved agent, plugins, queue, and inbox status        |
+| `m87 sync`                        | Nudge the daemon to sync + triage all active plugins now     |
+| `m87 list`                        | List the active review inbox                                 |
+| `m87 view <item>`                 | Show one item and its recommendation detail                  |
+| `m87 open <item>`                 | Print the item's source URL                                  |
+| `m87 copy-handoff <item>`         | Print a copyable agent handoff prompt for one item           |
+| `m87 preview <rec>`               | Preview what approving an option would do (the gate)         |
+| `m87 approve <rec>`               | Approve an option - the one human gate                       |
+| `m87 triage <item>`               | Triage one newly synced item                                 |
+| `m87 rerun <item>`                | Supersede the recommendation and re-triage an item           |
+| `m87 dismiss <item>`              | Dismiss an item                                              |
+| `m87 mark-handled <item>`         | Mark an item handled                                         |
+| `m87 snooze <item> <dur>`         | Snooze an item until later (e.g. `1d`, `4h`)                 |
+| `m87 plugin ...`                  | `add`, `list`, `configure`, `sync`, `doctor` source plugins  |
+| `m87 job ...`                     | `list`, `view`, `attach` automation jobs                     |
+| `m87 daemon ...`                  | `start`, `stop`, `status`, `restart`, `install`, `uninstall` |
+| `m87 audit export`                | Export the action audit trail                                |
+| `m87 audit receipt <id>`          | Show a receipt for an approval                               |
+| `m87 state export\|import`        | Portable, secret-redacted state export/import                |
+| `m87 retention policy`            | Show local data retention settings                           |
+| `m87 retention set <field> <ttl>` | Change a retention setting                                   |
+| `m87 retention cleanup`           | Purge data expired by the retention policy                   |
+| `m87 update [--check]`            | Check for and install a newer release from npm               |
 
 ### Flags
 

@@ -39,7 +39,7 @@ The product needs a clear human approval boundary, durable audit trail, and sour
 | Enough evidence for users to trust recommendations without opening every source.  | Do not optimize first for teams, shared queues, or delegated approvals.                                              |
 | Private reasoning, drafts, and approval history local by default.                 |                                                                                                                      |
 | Basic plugin trust model for first-party and third-party plugins.                 |                                                                                                                      |
-| Prompt-context retention cleanup with broader retention controls planned later.   |                                                                                                                      |
+| Retention controls for prompt context, drafts, attachments, and audit payloads.   |                                                                                                                      |
 
 ## Users And Use Cases
 
@@ -89,23 +89,23 @@ The MVP should prove the generic abstraction with one meaningfully rich source b
 GitHub is the first real plugin because it has code context, structured objects, stateful actions, and lower privacy risk than email.
 Gmail is deferred from the MVP and any bundled Gmail plugin should be treated as fixture-backed or demo-only until a later production hardening round.
 
-| MVP includes                                                                         | MVP excludes                         | V1 adds                                                                         |
-| ------------------------------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------- |
-| Local daemon polling configured plugins.                                             | Hosted sync service.                 | First-party X plugin if API access is viable.                                   |
-| SQLite database under `~/.m87`.                                                      | Mobile app.                          | Attachment summarization pipeline.                                              |
-| Commander CLI and Ink terminal inbox UI.                                             | Team inboxes.                        | Source-specific prompt packs.                                                   |
-| Bundled plugin installation, manifest validation, and manifest metadata persistence. | Webhook server.                      | Per-source and per-account policies.                                            |
-| Source plugin CLI protocol over JSON stdin/stdout.                                   | Cross-device sync.                   | Approval receipts and action audit export.                                      |
-| Item sync with plugin-owned fingerprints and explicit pagination/error semantics.    | Fully autonomous sending.            | Plugin sandboxing, signing, and permission enforcement.                         |
-| Agent recommendation generation using plugin context and action schemas.             | Plugin marketplace.                  | Import/export of local state.                                                   |
-| ACP agent runtime through bundled `acpx/runtime`; no native agent adapters.          | Complex workflow automation builder. | Optional webhook bridge for near-realtime sync.                                 |
-| Multi-option recommendations with structured evidence citations.                     |                                      | Optional encrypted cloud backup, not required for local operation.              |
-| Approve, edit, dismiss, snooze, open-source-item, and rerun flows.                   |                                      |                                                                                 |
-| Plugin-executed remote actions after approval.                                       |                                      |                                                                                 |
-| Local-only handled state with activity watermark retriage and state transitions.     |                                      |                                                                                 |
-| Prompt-context TTL defaults and cleanup.                                             |                                      | Configurable retention for raw context, drafts, attachments, and audit records. |
-| Mock plugin for tests and demos.                                                     |                                      |                                                                                 |
-| First-party GitHub plugin.                                                           |                                      | First-party Gmail plugin after MVP production hardening.                        |
+| MVP includes                                                                                      | MVP excludes                         | V1 adds                                                            |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| Local daemon polling configured plugins.                                                          | Hosted sync service.                 | First-party X plugin if API access is viable.                      |
+| SQLite database under `~/.m87`.                                                                   | Mobile app.                          | Attachment summarization pipeline.                                 |
+| Commander CLI and Ink terminal inbox UI.                                                          | Team inboxes.                        | Source-specific prompt packs.                                      |
+| Bundled plugin installation, manifest validation, and manifest metadata persistence.              | Webhook server.                      | Per-source and per-account policies.                               |
+| Source plugin CLI protocol over JSON stdin/stdout.                                                | Cross-device sync.                   | Approval receipts and action audit export.                         |
+| Item sync with plugin-owned fingerprints and explicit pagination/error semantics.                 | Fully autonomous sending.            | Plugin sandboxing, signing, and permission enforcement.            |
+| Agent recommendation generation using plugin context and action schemas.                          | Plugin marketplace.                  | Import/export of local state.                                      |
+| ACP agent runtime through bundled `acpx/runtime`; no native agent adapters.                       | Complex workflow automation builder. | Optional webhook bridge for near-realtime sync.                    |
+| Multi-option recommendations with structured evidence citations.                                  |                                      | Optional encrypted cloud backup, not required for local operation. |
+| Approve, edit, dismiss, snooze, open-source-item, and rerun flows.                                |                                      |                                                                    |
+| Plugin-executed remote actions after approval.                                                    |                                      |                                                                    |
+| Local-only handled state with activity watermark retriage and state transitions.                  |                                      |                                                                    |
+| Configurable retention defaults and cleanup for context, drafts, attachments, and audit payloads. |                                      | Per-source and per-account policies.                               |
+| Mock plugin for tests and demos.                                                                  |                                      |                                                                    |
+| First-party GitHub plugin.                                                                        |                                      | First-party Gmail plugin after MVP production hardening.           |
 
 ## User Experience
 
@@ -568,7 +568,7 @@ Requirements:
 - Store plugin source and capability information from installed plugin manifests.
 - Avoid logging secrets.
 - Redact plugin stderr in user-facing bug reports unless the user opts in.
-- Clean up expired prompt contexts and keep broader retention controls future-compatible.
+- Clean up expired raw context, rendered context, drafts, attachments, and audit payloads.
 - Prefer drafts over sends for email by default.
 - Prefer read-only plugin scopes during initial setup when writes are not needed.
 - Keep sensitive plugin scopes out of hosted-agent prompts by using local ACP targets or by not triaging those plugins.
@@ -578,16 +578,16 @@ Plugin executable risk is handled by the plugin trust model above.
 
 Retention defaults should support useful product behavior without hoarding source data forever.
 
-| Data                                                                            | MVP default                                                                  | Why it is retained                                                                            | User controls                                                              |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Normalized item and event envelopes                                             | Keep until user deletes the plugin or local database.                        | Needed for watermarks, state transitions, audit, and false-positive or false-negative review. | Delete plugin, export/import, future compaction.                           |
-| Raw or raw-ish fetched source context                                           | 30 days.                                                                     | Needed to inspect recommendations, rerun triage, and debug agent mistakes.                    | Per-source TTL: `never`, duration, or `keep`.                              |
-| Rendered human context and evidence catalog                                     | 90 days by default.                                                          | Needed to justify old recommendations without re-fetching from the source.                    | Per-source TTL.                                                            |
-| Full prompts sent to ACP targets                                                | 30 days by default.                                                          | Needed to debug recommendation quality and reproduce schema failures.                         | Global TTL; future per-plugin TTLs can allow `never` for sensitive scopes. |
-| Agent reasoning or intermediate stream text                                     | Do not persist by default.                                                   | Usually not required for product behavior and may contain sensitive derived content.          | Optional debug logging with explicit opt-in.                               |
-| Recommendation summaries, options, evidence refs, approvals, and action results | Keep.                                                                        | Core product history and audit trail.                                                         | Export/delete plugin; future audit compaction.                             |
-| Draft action payloads                                                           | Keep while recommendation is active; keep approved edited payloads in audit. | Needed for approval and audit.                                                                | Per-source TTL for inactive drafts.                                        |
-| Attachments and large source blobs                                              | 7 days or no local copy when plugin can re-fetch cheaply.                    | Useful for immediate triage but high privacy and storage risk.                                | Per-source TTL and max-size limits.                                        |
+| Data                                                                            | MVP default                                                                 | Why it is retained                                                                            | User controls                                                |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Normalized item and event envelopes                                             | Keep until user deletes the plugin or local database.                       | Needed for watermarks, state transitions, audit, and false-positive or false-negative review. | Delete plugin, export/import, future compaction.             |
+| Raw or raw-ish fetched source context                                           | 7 days.                                                                     | Needed to inspect recommendations, rerun triage, and debug agent mistakes.                    | Global `raw_context_ttl`: `never`, duration, or `keep`.      |
+| Rendered human context and evidence catalog                                     | 30 days by default.                                                         | Needed to justify old recommendations without re-fetching from the source.                    | Global `prompt_ttl`: `never`, duration, or `keep`.           |
+| Full prompts sent to ACP targets                                                | Do not persist as separate prompt bodies.                                   | Prompt context is stored in rendered and agent-facing context fields.                         | Global `prompt_ttl`.                                         |
+| Agent reasoning or intermediate stream text                                     | Do not persist by default.                                                  | Usually not required for product behavior and may contain sensitive derived content.          | Optional debug logging with explicit opt-in.                 |
+| Recommendation summaries, options, evidence refs, approvals, and action results | Keep skeleton records forever; compact bulky audit payloads after 365 days. | Core product history and audit trail.                                                         | Global `audit_ttl` for request, validation, preview, result. |
+| Draft action payloads                                                           | Keep while recommendation is active; purge inactive drafts after 30 days.   | Needed for approval and audit.                                                                | Global `draft_ttl`.                                          |
+| Attachments and large source blobs                                              | 7 days for files cached under the state directory's `attachments/` folder.  | Useful for immediate triage but high privacy and storage risk.                                | Global `attachment_ttl`.                                     |
 
 SQLite encryption is not required for MVP by default.
 Adding it usually means choosing and shipping SQLCipher or an equivalent encrypted SQLite build, managing passphrases or OS keychain integration, handling migrations and backups differently, and debugging more platform-specific installation failures.
@@ -654,7 +654,7 @@ E2e tests should cover:
 - Full review lifecycle: list, detail, approve, edit, dismiss, snooze, rerun, open-source-item, mark handled, and copy handoff prompt.
 - Approval execution with mocked plugin `validate-action`, `preview-action`, and `execute-action`, including partial failure, dependencies, optional action failure, required action failure, and idempotency retry.
 - Item state transitions for retriage, dismissal, snooze expiry, action errors, ignored items, and newer activity watermarks.
-- Prompt-context retention cleanup, with broader raw context, draft, attachment, and audit cleanup covered as future retention work.
+- Retention cleanup for raw context, rendered context, drafts, attachments, and audit payload compaction.
 - CLI output contracts for scriptable commands, including empty states and structured errors.
 - TUI smoke tests for launch, keyboard navigation, resize handling, and core review actions against fixture data.
 
