@@ -271,6 +271,7 @@ describe("core/retention", () => {
   });
 
   it("redacts old action event payloads to the replayable skeleton", () => {
+    insertActionResult(db, { id: "approval-1:a1", completedAt: daysAgo(400) });
     insertEvent(db, {
       id: "ev-act-old",
       entity: "action",
@@ -315,6 +316,35 @@ describe("core/retention", () => {
         .payload_json,
     );
     expect(fresh.result).toEqual({ url: "u" });
+  });
+
+  it("keeps queued action event payloads until processing completes", () => {
+    db.prepare("update retention_policies set audit_ttl='never'").run();
+    insertEvent(db, {
+      id: "ev-act-pending",
+      entity: "action",
+      lifecycle: "created",
+      createdAt: NOW.toISOString(),
+      payload: {
+        type: "queued",
+        action_id: "a1",
+        approval_id: "approval-1",
+        request: { action: { params: { body: "outgoing text" } } },
+      },
+    });
+    db.prepare(
+      `insert into queue (id, event_id, available_at, lane, attempts, status, created_at)
+       values ('q-act-pending', 'ev-act-pending', ?, 'default', 0, 'pending', ?)`,
+    ).run(NOW.toISOString(), NOW.toISOString());
+
+    const counts = sweepRetention(db, { now: NOW });
+    expect(counts.audit_events).toBe(0);
+
+    const payload = JSON.parse(
+      db.prepare("select payload_json from events where id='ev-act-pending'").get()
+        .payload_json,
+    );
+    expect(payload.request.action.params.body).toBe("outgoing text");
   });
 
   it("redacts draft payloads from superseded recommendations and their events", () => {
@@ -414,7 +444,13 @@ describe("core/retention", () => {
       entity: "action",
       lifecycle: "created",
       createdAt: daysAgo(400),
-      payload: { type: "queued", action_id: "a1", request: { x: 1 } },
+      payload: {
+        type: "queued",
+        action_result_id: "ar-old",
+        action_id: "a1",
+        approval_id: "approval-1",
+        request: { x: 1 },
+      },
     });
     sweepRetention(db, { now: NOW });
     const second = sweepRetention(db, { now: NOW });

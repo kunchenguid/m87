@@ -220,8 +220,17 @@ export function sweepRetention(db, { stateDir = null, now = new Date() } = {}) {
 function redactAuditEvents(db, cutoff) {
   const rows = db
     .prepare(
-      `select id, payload_json from events
-        where entity='action' and created_at <= ?`,
+      `select e.id, e.payload_json from events e
+         join action_results ar
+           on ar.id = coalesce(
+             json_extract(e.payload_json, '$.action_result_id'),
+             json_extract(e.payload_json, '$.approval_id') || ':' || json_extract(e.payload_json, '$.action_id')
+           )
+        where e.entity='action'
+          and ar.completed_at is not null
+          and ar.completed_at <= ?
+          and not exists (select 1 from queue q
+                           where q.event_id = e.id and q.status = 'pending')`,
     )
     .all(cutoff);
   const update = db.prepare("update events set payload_json=? where id=?");
