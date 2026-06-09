@@ -337,8 +337,9 @@ describe("core/retention", () => {
     expect(counts.audit_events).toBe(1);
 
     const old = JSON.parse(
-      db.prepare("select payload_json from events where id='ev-act-old-id'").get()
-        .payload_json,
+      db
+        .prepare("select payload_json from events where id='ev-act-old-id'")
+        .get().payload_json,
     );
     expect(old).toEqual({
       redacted: true,
