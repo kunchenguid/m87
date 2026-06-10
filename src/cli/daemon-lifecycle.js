@@ -118,6 +118,21 @@ export async function installManagedService(cliEntry) {
       activation = "write_only_activation_failed";
     }
   }
+  if (
+    activation === "write_only_activation_failed" &&
+    stopped?.status === "stopped"
+  ) {
+    const restored = startDetachedDaemon(cliEntry);
+    return {
+      status: "activation_failed",
+      manager: plan.manager,
+      label: plan.label,
+      unit: plan.unitPath,
+      activation,
+      stopped,
+      restored,
+    };
+  }
   return {
     status: "installed",
     manager: plan.manager,

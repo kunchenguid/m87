@@ -321,6 +321,7 @@ async function applyInitSelections(selections, context, mode) {
   if (
     result.status === "unsupported" ||
     result.status === "stop_failed" ||
+    result.status === "activation_failed" ||
     result.status === "deactivate_failed"
   ) {
     process.exitCode = 1;
@@ -1564,7 +1565,11 @@ daemon
   .description("Install the daemon as a managed OS service (start at login)")
   .action(async () => {
     const result = await installManagedService(CLI_ENTRY);
-    if (result.status === "unsupported" || result.status === "stop_failed") {
+    if (
+      result.status === "unsupported" ||
+      result.status === "stop_failed" ||
+      result.status === "activation_failed"
+    ) {
       process.exitCode = 1;
     }
     out(result);

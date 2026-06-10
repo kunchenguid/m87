@@ -108,6 +108,84 @@ describe("init apply daemon lifecycle", () => {
     }
   });
 
+  it("restores a session daemon when service activation fails after handover", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    const child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    process.env.M87_SERVICE_DRY_RUN = "0";
+    execFileSync.mockImplementation(() => {
+      throw new Error("activate failed");
+    });
+
+    try {
+      const result = await installManagedService(cliEntry);
+
+      expect(result).toMatchObject({
+        status: "activation_failed",
+        manager: servicePlan.manager,
+        label: servicePlan.label,
+        unit: servicePlan.unitPath,
+        activation: "write_only_activation_failed",
+        stopped: { status: "stopped", pid: child.pid },
+        restored: { status: "started", pid: 12345 },
+      });
+      expect(spawn).toHaveBeenCalledWith(
+        process.execPath,
+        [cliEntry, "daemon", "run"],
+        expect.objectContaining({ detached: true }),
+      );
+    } finally {
+      if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
+
+  it("keeps write-only service install success when no daemon was stopped", async () => {
+    process.env.M87_SERVICE_DRY_RUN = "0";
+    execFileSync.mockImplementation(() => {
+      throw new Error("activate failed");
+    });
+
+    const result = await installManagedService(cliEntry);
+
+    expect(result.status).toBe("installed");
+    expect(result.activation).toBe("write_only_activation_failed");
+    expect(result.stopped).toBeNull();
+    expect(result.restored).toBeUndefined();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("reports init failure when service activation fails after handover", async () => {
+    const child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    process.env.M87_SERVICE_DRY_RUN = "0";
+    execFileSync.mockImplementation(() => {
+      throw new Error("activate failed");
+    });
+
+    try {
+      const result = await apply(defaultInitSelections());
+
+      expect(result.status).toBe("activation_failed");
+      expect(result.daemon).toMatchObject({
+        status: "stopped",
+        pid: child.pid,
+      });
+      expect(result.service).toMatchObject({
+        status: "activation_failed",
+        activation: "write_only_activation_failed",
+        restored: { status: "started", pid: 12345 },
+      });
+    } finally {
+      if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
+
   it("does not install the managed service when handover stop fails", async () => {
     const servicePlan = getServicePlan(stateDir, cliEntry);
     const realKill = process.kill;
@@ -202,6 +280,36 @@ describe("init apply daemon lifecycle", () => {
     );
 
     expect(result.daemon).toEqual({ status: "not_running" });
+  });
+
+  it("reports init failure when wizard stop leaves the daemon stopping", async () => {
+    const realKill = process.kill;
+    const kill = vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+      if (pid === 4242) return true;
+      return realKill(pid, signal);
+    });
+    writeFileSync(join(stateDir, "daemon.pid"), "4242");
+    vi.useFakeTimers();
+
+    try {
+      const resultPromise = apply(
+        {
+          ...defaultInitSelections(),
+          installService: false,
+          startDaemon: false,
+          stopDaemon: true,
+        },
+        { daemonPid: 4242 },
+      );
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.status).toBe("stop_failed");
+      expect(result.daemon).toEqual({ status: "stopping", pid: 4242 });
+    } finally {
+      vi.useRealTimers();
+      kill.mockRestore();
+    }
   });
 
   it("uninstalls the managed service and keeps the daemon for session-only", async () => {

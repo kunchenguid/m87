@@ -100,7 +100,11 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
     const { stopped, ...service } = await installManagedService(cliEntry);
     result.service = service;
     if (stopped) result.daemon = stopped;
-    if (service.status === "stop_failed" || service.status === "unsupported") {
+    if (
+      service.status === "stop_failed" ||
+      service.status === "unsupported" ||
+      service.status === "activation_failed"
+    ) {
       result.status = service.status;
     }
   } else {
@@ -121,6 +125,9 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
       result.daemon = startDetachedDaemon(cliEntry);
     } else if (plan.daemon.stopDaemon) {
       result.daemon = await gracefulStopDaemon();
+      if (result.daemon.status === "stopping") {
+        result.status = "stop_failed";
+      }
     }
   }
 
