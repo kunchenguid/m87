@@ -230,6 +230,8 @@ Common GitHub plugin config keys:
 | `sync_limit_per_repo` | Maximum issues or pull requests to fetch per repository.                                               |
 | `lookback_days`       | Activity lookback window in days.                                                                      |
 | `activity_probe`      | `true` to probe extra activity when selecting work.                                                    |
+| `fix_pr_create`       | How maintainer fix jobs submit review work: `auto`, `no-mistakes`, `gh`, or `disabled`.                |
+| `fix_contrib_push`    | How contributor fix jobs leave the workspace: `auto`, `no-mistakes`, or `disabled`.                    |
 
 ### Gmail
 

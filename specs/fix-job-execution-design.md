@@ -130,9 +130,7 @@ Usage and token accounting flow through the existing `agent_runs` plumbing, with
 
 The human-approval boundary is satisfied at queue time: a job only exists because the user approved an option whose `automation` block created it.
 The job's remote effect is constrained to a **draft** PR, which is reviewable and reversible, not a merge or a comment to another person.
-
-Open decision: whether opening the draft PR needs a second explicit confirmation, or whether approval-at-queue-time plus draft-only is sufficient.
-Recommendation for MVP: draft-only, audited, no second prompt, with a plugin config gate (`fixes.enabled`, `fixes.pr_create: draft | disabled`) mirroring ezoss, so a cautious user can run "prepare + agent, but commit only / no PR."
+There is no second approval prompt before the draft PR; cautious users control submission policy through source-plugin config such as GitHub's `fix_pr_create` and `fix_contrib_push`.
 
 ## Failure, Recovery, Idempotency
 
@@ -151,17 +149,13 @@ Offline by default, mirroring the existing e2e style.
 - A GitHub-plugin contract test for the two new commands against recorded fixtures (no live network).
 - ACP `cwd` is exercised by pointing the mock ACP target at the prepared workspace and asserting it ran there.
 
-## Suggested Phasing
+## Implemented Phasing
 
-1. Core job runner + state machine + daemon Stage C, proven end-to-end with the **mock** plugin only (no GitHub yet). This is the bulk of the core work and is fully offline-testable.
-2. ACP `cwd` parameterization.
-3. GitHub plugin `prepare`/`submit` (worktree + `gh pr create --draft`), with recorded fixtures.
-4. Config gates (`fixes.*`), workspace retention, and the second-approval decision.
+1. Core job runner + state machine + daemon Stage C, proven end-to-end with the mock plugin.
+2. ACP `cwd` parameterization so the coding agent edits the prepared workspace.
+3. GitHub plugin `prepare`/`submit` with maintainer draft PRs, no-mistakes gate support, contributor manual-review flow, and delayed PR detection.
+4. Submission policy gates through `fix_pr_create` and `fix_contrib_push`.
 
-Phase 1 alone makes "fix jobs actually run" true for the abstraction; phase 3 makes it true for GitHub.
+## Remaining Questions
 
-## Open Questions
-
-- Second approval before the draft PR, or draft-only + audit?
 - Persistent per-repo checkout (ezoss-style investigations dir) versus a fresh clone per job - persistent is faster but adds state to manage.
-- Should `submit` always open a PR, or support a "commit to a branch, no PR" mode for users who push through their own tooling (e.g. no-mistakes)?

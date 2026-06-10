@@ -152,6 +152,21 @@ The TUI also builds a pre-approval WILL DO summary from action params; use plain
 Use the idempotency key whenever the source supports client tokens.
 When the source does not support client tokens, use natural keys or other best-effort checks and document that behavior in `idempotency`.
 
+## Automation Jobs
+
+Automation jobs are queued only after a user approves a recommendation option with an `automation` block.
+The core rejects automation blocks unless they include both a non-empty `kind` and a non-empty `prompt`.
+`kind` is a short user-visible label, and `prompt` is the task the coding agent runs.
+
+`prepare-automation-workspace` receives `{ config, job }`.
+The `job` object includes `id`, `kind`, `item_external_id`, `item_title`, `option_title`, `prompt`, and, when available, `role`.
+Use `item_title`, `option_title`, and `prompt` when creating branch names, commit messages, pull request titles, or pull request bodies so user-facing copy describes the source item and approved option instead of internal job ids.
+
+`submit-automation-workspace` receives `{ config, job, workspace_path, approval_id, idempotency_key }`.
+It should return `submitted`, `no_changes`, `waiting_for_pr`, or `failed`.
+Use `waiting_for_pr` when the source accepted the change but the review surface is created asynchronously; `detect-automation-pr` can later resolve that job to `submitted`.
+Submit commands must be idempotent for the provided `idempotency_key` and must not open duplicate review requests for the same job.
+
 ## Authoring Checklist
 
 - Use `m87-src-<source>` as the executable name.
@@ -164,4 +179,5 @@ When the source does not support client tokens, use natural keys or other best-e
 - Disclose all credential scopes and provenance accurately in setup documentation.
 - Prefer drafts or private source state over visible sends when the source supports it.
 - Validate and preview every remote action immediately before execution.
+- Use approved automation job context for human-facing commit and review copy.
 - Avoid logging secrets to stderr because users may still choose to share raw plugin logs.
