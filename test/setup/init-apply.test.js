@@ -130,6 +130,7 @@ describe("init apply daemon lifecycle", () => {
         unit: servicePlan.unitPath,
         activation: "write_only_activation_failed",
         stopped: { status: "stopped", pid: child.pid },
+        unitExistedBeforeInstall: false,
         restored: { status: "started", pid: 12345 },
       });
       expect(spawn).toHaveBeenCalledWith(
@@ -137,6 +138,39 @@ describe("init apply daemon lifecycle", () => {
         [cliEntry, "daemon", "run"],
         expect.objectContaining({ detached: true }),
       );
+    } finally {
+      if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
+
+  it("does not restore a session daemon when activation fails during reinstall", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    mkdirSync(dirname(servicePlan.unitPath), { recursive: true });
+    writeFileSync(servicePlan.unitPath, "existing unit");
+    const child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    process.env.M87_SERVICE_DRY_RUN = "0";
+    execFileSync.mockImplementation(() => {
+      throw new Error("activate failed");
+    });
+
+    try {
+      const result = await installManagedService(cliEntry);
+
+      expect(result).toMatchObject({
+        status: "activation_failed",
+        manager: servicePlan.manager,
+        label: servicePlan.label,
+        unit: servicePlan.unitPath,
+        activation: "write_only_activation_failed",
+        stopped: { status: "stopped", pid: child.pid },
+        unitExistedBeforeInstall: true,
+      });
+      expect(result.restored).toBeUndefined();
+      expect(spawn).not.toHaveBeenCalled();
     } finally {
       if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
     }
@@ -179,6 +213,7 @@ describe("init apply daemon lifecycle", () => {
       expect(result.service).toMatchObject({
         status: "activation_failed",
         activation: "write_only_activation_failed",
+        unitExistedBeforeInstall: false,
         restored: { status: "started", pid: 12345 },
       });
     } finally {

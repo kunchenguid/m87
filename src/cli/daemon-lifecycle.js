@@ -93,6 +93,7 @@ export async function installManagedService(cliEntry) {
   if (!plan) {
     return { status: "unsupported", platform: process.platform };
   }
+  const unitExistedBeforeInstall = existsSync(plan.unitPath);
   const stopped =
     runningDaemonPid() !== null ? await gracefulStopDaemon() : null;
   if (stopped?.status === "stopping") {
@@ -120,7 +121,8 @@ export async function installManagedService(cliEntry) {
   }
   if (
     activation === "write_only_activation_failed" &&
-    stopped?.status === "stopped"
+    stopped?.status === "stopped" &&
+    !unitExistedBeforeInstall
   ) {
     const restored = startDetachedDaemon(cliEntry);
     return {
@@ -130,7 +132,22 @@ export async function installManagedService(cliEntry) {
       unit: plan.unitPath,
       activation,
       stopped,
+      unitExistedBeforeInstall,
       restored,
+    };
+  }
+  if (
+    activation === "write_only_activation_failed" &&
+    stopped?.status === "stopped"
+  ) {
+    return {
+      status: "activation_failed",
+      manager: plan.manager,
+      label: plan.label,
+      unit: plan.unitPath,
+      activation,
+      stopped,
+      unitExistedBeforeInstall,
     };
   }
   return {
@@ -140,6 +157,7 @@ export async function installManagedService(cliEntry) {
     unit: plan.unitPath,
     activation,
     stopped,
+    unitExistedBeforeInstall,
   };
 }
 
