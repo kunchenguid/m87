@@ -1,12 +1,14 @@
 import {
+  chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import Database from "better-sqlite3";
@@ -130,6 +132,36 @@ describe("e2e: m87 CLI with a real daemon (sole consumer)", () => {
     const status = yaml.load(stdout);
     expect(status.running).toBe(false);
     expect(status.status).toBe("not_running");
+  });
+
+  it("daemon uninstall exits nonzero when service deactivation fails", async () => {
+    await m87("init");
+    await runM87(CLI, ["daemon", "install"], {
+      ...env,
+      M87_SERVICE_DRY_RUN: "1",
+    });
+
+    const binDir = join(homeDir, "bin");
+    mkdirSync(binDir, { recursive: true });
+    const serviceCommand =
+      process.platform === "darwin"
+        ? "launchctl"
+        : process.platform === "win32"
+          ? "schtasks"
+          : "systemctl";
+    const fakeCommand = join(binDir, serviceCommand);
+    writeFileSync(fakeCommand, "#!/bin/sh\nexit 1\n");
+    chmodSync(fakeCommand, 0o755);
+
+    const err = await runM87(CLI, ["daemon", "uninstall"], {
+      ...env,
+      M87_SERVICE_DRY_RUN: "0",
+      PATH: `${binDir}${delimiter}${env.PATH}`,
+    }).catch((e) => e);
+    const result = yaml.load(err.stdout);
+    expect(err.code).toBe(1);
+    expect(result.status).toBe("uninstalled");
+    expect(result.deactivation).toBe("deactivate_failed");
   });
 
   it("daemon syncs+triages; approve flows to handled via the event log", async () => {

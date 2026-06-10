@@ -1575,7 +1575,10 @@ daemon
   .description("Remove the managed OS service for the daemon")
   .action(async () => {
     const result = await uninstallManagedService(CLI_ENTRY);
-    if (result.status === "unsupported") {
+    if (
+      result.status === "unsupported" ||
+      result.deactivation === "deactivate_failed"
+    ) {
       process.exitCode = 1;
     }
     out(result);
