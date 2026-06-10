@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasUsableAutomation } from "../../src/cli/index.js";
+import { hasUsableAutomation } from "../../src/cli/automation.js";
 
 describe("cli/hasUsableAutomation", () => {
   it("requires both kind and prompt", () => {

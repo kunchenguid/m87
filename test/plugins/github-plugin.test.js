@@ -1244,7 +1244,7 @@ describe("github source plugin (contract v2)", () => {
       [
         "#!/usr/bin/env node",
         'import { appendFileSync } from "node:fs";',
-        'import { execSync } from "node:child_process";',
+        'import { execFileSync, execSync } from "node:child_process";',
         "const args = process.argv.slice(2);",
         `appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + "\\n");`,
         ...scriptLines,
@@ -1270,7 +1270,7 @@ describe("github source plugin (contract v2)", () => {
     // remote is missing.
     const { fakeBinPath, callsPath } = await writeFakeNoMistakes([
       'if (args[0] === "--version") { process.stdout.write("9.9.9"); process.exit(0); }',
-      `if (args[0] === "init") { execSync("git remote add no-mistakes ${gate}", { cwd: process.cwd() }); process.exit(0); }`,
+      `if (args[0] === "init") { execFileSync("git", ["remote", "add", "no-mistakes", ${JSON.stringify(gate)}], { cwd: process.cwd() }); process.exit(0); }`,
     ]);
     const { fakeGhPath } = await writeFakeGh([
       'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',

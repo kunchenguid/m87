@@ -63,6 +63,7 @@ import {
   defaultInitSelections,
   validateInitSelections,
 } from "../setup/init-model.js";
+import { hasUsableAutomation } from "./automation.js";
 
 const CLI_ENTRY = fileURLToPath(import.meta.url);
 
@@ -160,23 +161,6 @@ function parseConfigPairs(pairs = []) {
     }
   }
   return config;
-}
-
-export function hasUsableAutomation(automationJson) {
-  if (!automationJson) {
-    return false;
-  }
-  try {
-    const automation = JSON.parse(automationJson);
-    return Boolean(
-      typeof automation?.kind === "string" &&
-      automation.kind.trim() &&
-      typeof automation?.prompt === "string" &&
-      automation.prompt.trim(),
-    );
-  } catch {
-    return false;
-  }
 }
 
 const program = new Command();
