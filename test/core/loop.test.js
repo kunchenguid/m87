@@ -60,7 +60,7 @@ const fakeEffects = {
                 safety: "external_write",
               },
             ],
-            automation: { prompt: "fix it" },
+            automation: { kind: "fix", prompt: "fix it" },
           },
         ],
       },
