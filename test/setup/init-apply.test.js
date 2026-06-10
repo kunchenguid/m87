@@ -200,4 +200,73 @@ describe("init apply daemon lifecycle", () => {
 
     expect(result.daemon).toEqual({ status: "not_running" });
   });
+
+  it("uninstalls the managed service and keeps the daemon for session-only", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    mkdirSync(dirname(servicePlan.unitPath), { recursive: true });
+    writeFileSync(servicePlan.unitPath, "existing unit");
+    const child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+
+    try {
+      const result = await apply(
+        {
+          ...defaultInitSelections(),
+          installService: false,
+          startDaemon: true,
+        },
+        { daemonPid: child.pid, serviceInstalled: true },
+      );
+
+      expect(result.service_uninstall).toMatchObject({
+        status: "uninstalled",
+        manager: servicePlan.manager,
+        label: servicePlan.label,
+        unit: servicePlan.unitPath,
+      });
+      expect(existsSync(servicePlan.unitPath)).toBe(false);
+      expect(result.daemon).toEqual({
+        status: "already_running",
+        pid: child.pid,
+      });
+      expect(child.exitCode).toBe(null);
+    } finally {
+      if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
+
+  it("uninstalls the managed service before stopping", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    mkdirSync(dirname(servicePlan.unitPath), { recursive: true });
+    writeFileSync(servicePlan.unitPath, "existing unit");
+    const child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+
+    try {
+      const result = await apply(
+        {
+          ...defaultInitSelections(),
+          installService: false,
+          startDaemon: false,
+          stopDaemon: true,
+        },
+        { daemonPid: child.pid, serviceInstalled: true },
+      );
+
+      expect(result.service_uninstall.status).toBe("uninstalled");
+      expect(existsSync(servicePlan.unitPath)).toBe(false);
+      expect(result.daemon).toMatchObject({
+        status: "stopped",
+        pid: child.pid,
+      });
+    } finally {
+      if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
 });

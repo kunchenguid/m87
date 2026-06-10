@@ -85,6 +85,12 @@ describe("setup/init model", () => {
       { ...runningContext, serviceInstalled: true },
     );
     expect(model.screen.choices[0].detail).toContain("current setup");
+    expect(model.screen.choices[1].detail).toContain(
+      "stops launching automatically",
+    );
+    expect(model.screen.choices[2].detail).toContain(
+      "stops launching automatically",
+    );
   });
 
   it("plans keep-running instead of start when M87 is already running", () => {
@@ -102,6 +108,22 @@ describe("setup/init model", () => {
     ).toContain("Keep M87 running");
     // Starting again would be a no-op, so the plan does not pretend to do it.
     expect(session.commands).not.toContain("m87 daemon start");
+    expect(session.sideEffects.map((e) => e.id)).not.toContain(
+      "service-uninstall",
+    );
+  });
+
+  it("plans startup removal when choosing session-only with startup enabled", () => {
+    const plan = buildInitApplyPlan(
+      { ...defaultInitSelections(), installService: false },
+      { ...runningContext, serviceInstalled: true },
+    );
+    expect(plan.daemon.uninstallService).toBe(true);
+    expect(plan.sideEffects.map((e) => e.id)).toContain("service-uninstall");
+    expect(plan.commands).toEqual(
+      expect.arrayContaining(["m87 daemon uninstall"]),
+    );
+    expect(plan.commands).not.toContain("m87 daemon start");
   });
 
   it("plans a stop when the user chooses to stop the running M87", () => {
@@ -114,11 +136,30 @@ describe("setup/init model", () => {
     const plan = buildInitApplyPlan(selections, runningContext);
     expect(plan.daemon).toEqual({
       installService: false,
+      uninstallService: false,
       startDaemon: false,
       stopDaemon: true,
     });
     expect(plan.sideEffects.map((e) => e.id)).toContain("daemon-stop");
     expect(plan.commands).toContain("m87 daemon stop");
+  });
+
+  it("plans startup removal before stop when startup is enabled", () => {
+    const selections = {
+      ...defaultInitSelections(),
+      installService: false,
+      startDaemon: false,
+      stopDaemon: true,
+    };
+    const plan = buildInitApplyPlan(selections, {
+      ...runningContext,
+      serviceInstalled: true,
+    });
+    expect(plan.daemon.uninstallService).toBe(true);
+    expect(plan.sideEffects.map((e) => e.id)).toContain("service-uninstall");
+    expect(plan.commands.indexOf("m87 daemon uninstall")).toBeLessThan(
+      plan.commands.indexOf("m87 daemon stop"),
+    );
   });
 
   it("ignores a stale stop choice when nothing is running", () => {

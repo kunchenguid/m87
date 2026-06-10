@@ -7,6 +7,7 @@ import {
   gracefulStopDaemon,
   installManagedService,
   startDetachedDaemon,
+  uninstallManagedService,
 } from "../cli/daemon-lifecycle.js";
 import {
   ensureStateDir,
@@ -74,6 +75,7 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
     agent: { mode: plan.agent.mode, target: plan.agent.configValue },
     source: { type: plan.source.type },
     service: { status: "skipped" },
+    service_uninstall: { status: "skipped" },
     daemon: { status: "not_started" },
     commands: plan.commands,
     warnings: [],
@@ -101,10 +103,18 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
     if (service.status === "stop_failed" || service.status === "unsupported") {
       result.status = service.status;
     }
-  } else if (plan.daemon.startDaemon) {
-    result.daemon = startDetachedDaemon(cliEntry);
-  } else if (plan.daemon.stopDaemon) {
-    result.daemon = await gracefulStopDaemon();
+  } else {
+    if (plan.daemon.uninstallService) {
+      result.service_uninstall = await uninstallManagedService(cliEntry);
+      if (result.service_uninstall.status === "unsupported") {
+        result.status = "unsupported";
+      }
+    }
+    if (plan.daemon.startDaemon) {
+      result.daemon = startDetachedDaemon(cliEntry);
+    } else if (plan.daemon.stopDaemon) {
+      result.daemon = await gracefulStopDaemon();
+    }
   }
 
   return result;

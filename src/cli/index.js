@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import {
-  constants,
   existsSync,
   readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { access, readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,10 +49,11 @@ import {
   installManagedService,
   runningDaemonPid,
   startDetachedDaemon,
+  uninstallManagedService,
 } from "./daemon-lifecycle.js";
 import { getStatePaths, loadConfig, saveConfig } from "./state.js";
 import { openRuntime, runOnce } from "./runtime.js";
-import { getServicePlan, isServiceDryRun } from "./service.js";
+import { getServicePlan } from "./service.js";
 import { compareSemver, fetchLatestVersion, isUpdateDryRun } from "./update.js";
 import { recommendationDetail } from "../core/views.js";
 import { renderInboxView } from "../tui/render.js";
@@ -1570,31 +1570,11 @@ daemon
   .command("uninstall")
   .description("Remove the managed OS service for the daemon")
   .action(async () => {
-    const { stateDir } = getStatePaths();
-    const plan = getServicePlan(stateDir, CLI_ENTRY);
-    if (!plan) {
+    const result = await uninstallManagedService(CLI_ENTRY);
+    if (result.status === "unsupported") {
       process.exitCode = 1;
-      return out({ status: "unsupported", platform: process.platform });
     }
-    let installed = true;
-    try {
-      await access(plan.unitPath, constants.F_OK);
-    } catch {
-      installed = false;
-    }
-    if (!installed) return out({ status: "no_op", manager: plan.manager });
-    if (!isServiceDryRun()) {
-      try {
-        execFileSync(plan.deactivate.command, plan.deactivate.args, {
-          stdio: "ignore",
-          timeout: 10000,
-        });
-      } catch {
-        // best-effort; still remove the unit file
-      }
-    }
-    await rm(plan.unitPath, { force: true });
-    out({ status: "uninstalled", manager: plan.manager, label: plan.label });
+    out(result);
   });
 
 // --- update ----------------------------------------------------------------

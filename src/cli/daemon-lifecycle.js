@@ -6,7 +6,7 @@ import {
   openSync,
   readFileSync,
 } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { sendControl } from "../core/control.js";
@@ -125,5 +125,36 @@ export async function installManagedService(cliEntry) {
     unit: plan.unitPath,
     activation,
     stopped,
+  };
+}
+
+export async function uninstallManagedService(cliEntry) {
+  const { stateDir } = getStatePaths();
+  const plan = getServicePlan(stateDir, cliEntry);
+  if (!plan) {
+    return { status: "unsupported", platform: process.platform };
+  }
+  if (!existsSync(plan.unitPath)) {
+    return { status: "no_op", manager: plan.manager };
+  }
+  let deactivation = "skipped_dry_run";
+  if (!isServiceDryRun()) {
+    try {
+      execFileSync(plan.deactivate.command, plan.deactivate.args, {
+        stdio: "ignore",
+        timeout: 10000,
+      });
+      deactivation = "deactivated";
+    } catch {
+      deactivation = "deactivate_failed";
+    }
+  }
+  await rm(plan.unitPath, { force: true });
+  return {
+    status: "uninstalled",
+    manager: plan.manager,
+    label: plan.label,
+    unit: plan.unitPath,
+    deactivation,
   };
 }

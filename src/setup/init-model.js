@@ -198,6 +198,8 @@ export function buildInitApplyPlan(input = {}, context = {}) {
   }
 
   const daemonRunning = Boolean(context.daemonPid);
+  const uninstallService =
+    Boolean(context.serviceInstalled) && !selections.installService;
   if (selections.installService) {
     sideEffects.push({
       id: "service",
@@ -207,6 +209,13 @@ export function buildInitApplyPlan(input = {}, context = {}) {
     });
     commands.unshift("m87 daemon install");
   } else if (selections.startDaemon) {
+    if (uninstallService) {
+      sideEffects.push({
+        id: "service-uninstall",
+        label: "Stop launching M87 automatically at startup",
+      });
+      commands.unshift("m87 daemon uninstall");
+    }
     sideEffects.push({
       id: "daemon-start",
       label: daemonRunning
@@ -215,6 +224,13 @@ export function buildInitApplyPlan(input = {}, context = {}) {
     });
     if (!daemonRunning) commands.unshift("m87 daemon start");
   } else if (selections.stopDaemon && daemonRunning) {
+    if (uninstallService) {
+      sideEffects.push({
+        id: "service-uninstall",
+        label: "Stop launching M87 automatically at startup",
+      });
+      commands.unshift("m87 daemon uninstall");
+    }
     sideEffects.push({
       id: "daemon-stop",
       label: "Stop M87 until you start it again",
@@ -241,6 +257,7 @@ export function buildInitApplyPlan(input = {}, context = {}) {
         : { type: "skip", pluginId: null, config: {} },
     daemon: {
       installService: Boolean(selections.installService),
+      uninstallService,
       startDaemon: Boolean(selections.startDaemon),
       stopDaemon: Boolean(selections.stopDaemon) && daemonRunning,
     },
@@ -370,7 +387,12 @@ function sourceScreen(selections) {
   };
 }
 
-const DAEMON_EFFECT_IDS = new Set(["service", "daemon-start", "daemon-stop"]);
+const DAEMON_EFFECT_IDS = new Set([
+  "service",
+  "service-uninstall",
+  "daemon-start",
+  "daemon-stop",
+]);
 
 function reviewChoices(selections, context) {
   if (context.daemonPid) {
@@ -388,13 +410,17 @@ function reviewChoices(selections, context) {
       {
         id: "session",
         label: "Keep running (this session only)",
-        detail: "Keeps running until you restart your computer.",
+        detail: context.serviceInstalled
+          ? "Keeps running now and stops launching automatically at startup."
+          : "Keeps running until you restart your computer.",
         selected: !selections.installService && selections.startDaemon,
       },
       {
         id: "stop",
         label: "Stop running",
-        detail: "Stops background syncing until you start M87 again.",
+        detail: context.serviceInstalled
+          ? "Stops background syncing and stops launching automatically at startup."
+          : "Stops background syncing until you start M87 again.",
         selected: !selections.installService && !selections.startDaemon,
       },
     ];
