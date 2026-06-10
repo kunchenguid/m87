@@ -6,9 +6,9 @@ export function hasUsableAutomation(automationJson) {
     const automation = JSON.parse(automationJson);
     return Boolean(
       typeof automation?.kind === "string" &&
-        automation.kind.trim() &&
-        typeof automation?.prompt === "string" &&
-        automation.prompt.trim(),
+      automation.kind.trim() &&
+      typeof automation?.prompt === "string" &&
+      automation.prompt.trim(),
     );
   } catch {
     return false;
