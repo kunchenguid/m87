@@ -3,6 +3,7 @@
 Thanks for wanting to contribute. One rule up front:
 
 **Human-authored pull requests targeting `main` must be raised through [`no-mistakes`](https://github.com/kunchenguid/no-mistakes).**
+We require this to reduce the maintainer's burden of reviewing and merging contributions.
 
 `no-mistakes` puts a local git proxy in front of your real remote.
 Pushing through it runs an AI-driven review/test/lint pipeline in an isolated worktree, forwards the push upstream only after every check passes, and opens a clean PR automatically.
@@ -42,7 +43,6 @@ The global `m87` binary is a built snapshot, so reinstall it (`npm pack` then `n
 
 ## Repo conventions
 
-- Use TDD for bug fixes and new features (metadata, docs, and ephemeral artifacts excepted).
 - Tests live under `test/`: unit tests by area (`test/core/`, `test/host/`, `test/agent/`, `test/tui/`, `test/plugins/`), integration in `test/integration/`, and end-to-end in `test/e2e/`. Shared helpers are in `test/support/`.
 - E2e helpers spawn the real CLI in tracked process groups and Vitest runs a global cleanup sweep, so timed-out or interrupted runs should not leave CLI or plugin child processes behind.
 - Run `pnpm run lint`, `pnpm run format:check`, `pnpm run typecheck`, and `pnpm test` before pushing. CI runs them again, but a fast local pass saves rounds.
