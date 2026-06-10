@@ -31,7 +31,9 @@ export function defaultInitSelections(overrides = {}) {
     githubRepoInput: "",
     githubUsername: "",
     installService: true,
+    uninstallService: false,
     startDaemon: true,
+    stopDaemon: false,
     choiceIndex: 0,
     notice: "",
     ...overrides,
@@ -196,18 +198,51 @@ export function buildInitApplyPlan(input = {}, context = {}) {
     );
   }
 
+  const daemonRunning = Boolean(context.daemonPid);
+  const uninstallService =
+    Boolean(context.serviceInstalled) && Boolean(selections.uninstallService);
   if (selections.installService) {
     sideEffects.push({
       id: "service",
-      label: "Start M87 now and launch it automatically at startup",
+      label: daemonRunning
+        ? "Keep M87 running and launch it automatically at startup"
+        : "Start M87 now and launch it automatically at startup",
     });
     commands.unshift("m87 daemon install");
   } else if (selections.startDaemon) {
+    if (uninstallService) {
+      sideEffects.push({
+        id: "service-uninstall",
+        label: "Stop launching M87 automatically at startup",
+      });
+      commands.unshift("m87 daemon uninstall");
+    }
     sideEffects.push({
       id: "daemon-start",
-      label: "Start M87 for this session",
+      label: daemonRunning
+        ? "Keep M87 running for this session"
+        : "Start M87 for this session",
     });
-    commands.unshift("m87 daemon start");
+    if (!daemonRunning) commands.unshift("m87 daemon start");
+  } else if (selections.stopDaemon && daemonRunning) {
+    if (uninstallService) {
+      sideEffects.push({
+        id: "service-uninstall",
+        label: "Stop launching M87 automatically at startup",
+      });
+      commands.unshift("m87 daemon uninstall");
+    }
+    sideEffects.push({
+      id: "daemon-stop",
+      label: "Stop M87 until you start it again",
+    });
+    commands.unshift("m87 daemon stop");
+  } else if (uninstallService) {
+    sideEffects.push({
+      id: "service-uninstall",
+      label: "Stop launching M87 automatically at startup",
+    });
+    commands.unshift("m87 daemon uninstall");
   }
 
   return {
@@ -229,7 +264,9 @@ export function buildInitApplyPlan(input = {}, context = {}) {
         : { type: "skip", pluginId: null, config: {} },
     daemon: {
       installService: Boolean(selections.installService),
+      uninstallService,
       startDaemon: Boolean(selections.startDaemon),
+      stopDaemon: Boolean(selections.stopDaemon) && daemonRunning,
     },
     sideEffects,
     commands: [...new Set(commands.reverse())],
@@ -357,43 +394,95 @@ function sourceScreen(selections) {
   };
 }
 
-function screenFor(selections, context, plan) {
-  if (selections.currentStep === "agent")
-    return agentScreen(selections, context);
-  if (selections.currentStep === "source") return sourceScreen(selections);
-  // Final step: review everything that will happen, and choose whether to run
-  // M87 in the background. That choice (the radios below) drives the
-  // service/session daemon, so its side effect is left out of the reviewed list
-  // to avoid restating it.
-  return {
-    heading: "Review & Finish",
-    body: plan.sideEffects
-      .filter(
-        (effect) => effect.id !== "service" && effect.id !== "daemon-start",
-      )
-      .map((effect) => effect.label),
-    choices: [
+const DAEMON_EFFECT_IDS = new Set([
+  "service",
+  "service-uninstall",
+  "daemon-start",
+  "daemon-stop",
+]);
+
+function reviewChoices(selections, context) {
+  if (context.daemonPid) {
+    // M87 is already running: the choice is whether to keep it that way, not
+    // whether to start it.
+    return [
       {
         id: "service",
-        label: "Start now & launch at login",
-        detail:
-          "Recommended. Syncs in the background now and after every restart.",
+        label: "Keep running & launch at login",
+        detail: context.serviceInstalled
+          ? "Recommended. This is your current setup."
+          : "Recommended. Keeps syncing in the background after every restart.",
         selected: selections.installService,
       },
       {
         id: "session",
-        label: "Start now (this session only)",
-        detail: "Runs in the background until you restart your computer.",
+        label: "Keep running (this session only)",
+        detail: context.serviceInstalled
+          ? "Keeps running now and stops launching automatically at startup."
+          : "Keeps running until you restart your computer.",
         selected: !selections.installService && selections.startDaemon,
       },
       {
-        id: "none",
-        label: "Don't start it yet",
-        detail: "You can start M87 yourself later.",
+        id: "stop",
+        label: "Stop running",
+        detail: context.serviceInstalled
+          ? "Stops background syncing and stops launching automatically at startup."
+          : "Stops background syncing until you start M87 again.",
         selected: !selections.installService && !selections.startDaemon,
       },
-    ],
+    ];
+  }
+  return [
+    {
+      id: "service",
+      label: "Start now & launch at login",
+      detail: context.serviceInstalled
+        ? "Recommended. Keeps your current startup setup and starts M87 now."
+        : "Recommended. Syncs in the background now and after every restart.",
+      selected: selections.installService,
+    },
+    {
+      id: "session",
+      label: "Start now (this session only)",
+      detail: context.serviceInstalled
+        ? "Starts M87 now and stops launching automatically at startup."
+        : "Runs in the background until you restart your computer.",
+      selected: !selections.installService && selections.startDaemon,
+    },
+    {
+      id: "none",
+      label: "Don't start it yet",
+      detail: context.serviceInstalled
+        ? "Does not start M87 and stops launching automatically at startup."
+        : "You can start M87 yourself later.",
+      selected: !selections.installService && !selections.startDaemon,
+    },
+  ];
+}
+
+function reviewScreen(selections, context, plan) {
+  // Final step: review everything that will happen, and choose whether to run
+  // M87 in the background. That choice (the radios below) drives the
+  // service/session daemon, so its side effect is left out of the reviewed list
+  // to avoid restating it.
+  const body = plan.sideEffects
+    .filter((effect) => !DAEMON_EFFECT_IDS.has(effect.id))
+    .map((effect) => effect.label);
+  if (context.daemonPid) {
+    body.push("M87 is already running in the background.");
+  }
+  return {
+    heading: "Review & Finish",
+    body,
+    choices: reviewChoices(selections, context),
   };
+}
+
+function screenFor(selections, context, plan) {
+  if (selections.currentStep === "agent")
+    return agentScreen(selections, context);
+  if (selections.currentStep === "source") return sourceScreen(selections);
+  return reviewScreen(selections, context, plan);
 }
 
 export function buildInitWizardModel(input = {}, context = {}) {

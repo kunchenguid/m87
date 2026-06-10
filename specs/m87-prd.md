@@ -117,6 +117,7 @@ m87
 ```
 
 The first-run setup wizard initializes local state, lets the user use auto-detect or pick a detected AI agent, offers GitHub or skip source setup, and finishes with a background-run choice: launch at login, this session only, or not yet.
+If M87 is already running, the wizard acknowledges that state and offers to keep it running at login, keep it running for this session only, or stop it.
 Scripted setup uses `m87 init --yes --plugin github --github-repo owner/repo`, or `--plugin skip` when a source should be configured later.
 The interactive flow is agent choice, source choice, then review and finish.
 A configured plugin is the unit of scope; there is no separate source-account object.

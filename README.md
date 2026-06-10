@@ -57,6 +57,7 @@ $ m87 init
 ```
 
 The wizard creates local state, lets you use auto-detect or pick a detected AI agent, connects GitHub or skips source setup, and finishes by choosing whether M87 runs in the background at login, for this session only, or later.
+If M87 is already running, that final step says so and changes the choice to keeping it running at login, keeping it running for this session only, or stopping it.
 For scripts or CI, use flags instead of prompts:
 
 ```sh
@@ -176,7 +177,7 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 | `init`                     | `--github-public-starred`     | Sync public owned repositories starred by user        |
 | `init`                     | `--github-authored-external`  | Sync authored issues and PRs outside configured repos |
 | `init`                     | `--install-service`           | Start now and launch at login                         |
-| `init`                     | `--no-install-service`        | Do not start in the background yet                    |
+| `init`                     | `--no-install-service`        | Do not install the login service                      |
 | `init`                     | `--start-daemon`              | Start now for this session only                       |
 | `preview`                  | `--option <selector>`         | Pick an option by id or position                      |
 | `approve`                  | `--option <selector>`         | Pick an option by id or position                      |
@@ -261,6 +262,8 @@ m87 daemon uninstall
 ```
 
 A detached or managed daemon writes operational logs to `~/.m87/daemon.log`, including startup, shutdown, loop errors, sync failures, and sync recovery.
+Installing the managed service stops any session daemon first, then lets the service own the background process so only one daemon works on the local state.
+If `m87 daemon restart` cannot stop the old daemon within its stop window, it reports `stop_failed` instead of starting another daemon.
 Failed source syncs are retried with backoff instead of being parked forever; a plugin returns to active after a later successful sync.
 
 A managed daemon launched from a GUI context inherits a minimal `PATH`, so `m87` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs.

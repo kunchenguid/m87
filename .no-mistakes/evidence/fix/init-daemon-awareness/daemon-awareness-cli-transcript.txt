@@ -1,0 +1,96 @@
+$ m87 init --yes --no-install-service --start-daemon
+
+status: initialized
+mode: headless
+state_dir: /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-evidence-PJZkRz/.m87
+agent:
+  mode: auto
+  target: null
+source:
+  type: skip
+service:
+  status: skipped
+service_uninstall:
+  status: skipped
+daemon:
+  status: started
+  pid: 10220
+  log: >-
+    /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-evidence-PJZkRz/.m87/daemon.log
+commands:
+  - m87
+  - m87 daemon start
+warnings: []
+
+$ m87 daemon status
+
+status: running
+running: true
+pid: 10220
+
+$ m87 daemon install
+
+status: installed
+manager: launchd
+label: com.m87.daemon.0f9384e9d2
+unit: >-
+  /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-evidence-PJZkRz/Library/LaunchAgents/com.m87.daemon.0f9384e9d2.plist
+activation: skipped_dry_run
+stopped:
+  status: stopped
+  pid: 10220
+unitExistedBeforeInstall: false
+
+$ m87 daemon status
+
+status: not_running
+running: false
+
+$ m87 daemon start
+
+status: started
+pid: 10233
+log: >-
+  /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-evidence-PJZkRz/.m87/daemon.log
+
+$ m87 daemon restart
+
+status: restarted
+pid: 10246
+log: >-
+  /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-evidence-PJZkRz/.m87/daemon.log
+stopped: 10233
+
+$ m87 daemon stop
+
+status: not_running
+
+
+
+Evidence summary:
+
+initializedDaemon:
+  status: started
+  pid: 10220
+  log: >-
+    /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-evidence-PJZkRz/.m87/daemon.log
+statusWhileRunning:
+  status: running
+  running: true
+  pid: 10220
+installHandover:
+  status: installed
+  activation: skipped_dry_run
+  stopped:
+    status: stopped
+    pid: 10220
+statusAfterInstall:
+  status: not_running
+  running: false
+restart:
+  status: restarted
+  pid: 10246
+  log: >-
+    /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-evidence-PJZkRz/.m87/daemon.log
+  stopped: 10233
+daemonLogStartupLines: 2

@@ -93,6 +93,44 @@ describe("setup/init fullscreen wizard", () => {
     }
   });
 
+  it("offers stop instead of start when M87 is already running", async () => {
+    const stdout = new FakeStdout();
+    const stdin = new FakeStdin();
+    const { instance, restore, result } = startInitWizardTui({
+      stdout: /** @type {any} */ (stdout),
+      stdin: /** @type {any} */ (stdin),
+      context: {
+        stateDir: "/tmp/m87-state",
+        serviceManager: "launchd",
+        daemonPid: 4242,
+      },
+      initialSelections: { currentStep: "review" },
+    });
+
+    try {
+      await sleep(50);
+      // Default keeps the running daemon as a login service; two steps down
+      // is the stop option that replaces "Don't start it yet".
+      pressDown(stdin);
+      await sleep(20);
+      pressDown(stdin);
+      await sleep(20);
+      pressReturn(stdin);
+      const selections = await Promise.race([
+        result,
+        sleep(500).then(() => null),
+      ]);
+      expect(selections).not.toBeNull();
+      expect(selections.installService).toBe(false);
+      expect(selections.startDaemon).toBe(false);
+      expect(selections.stopDaemon).toBe(true);
+    } finally {
+      instance.unmount();
+      await instance.waitUntilExit();
+      restore();
+    }
+  });
+
   it("highlights GitHub without entering its config; selecting skip advances past source", async () => {
     const stdout = new FakeStdout();
     const stdin = new FakeStdin();

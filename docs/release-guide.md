@@ -39,6 +39,7 @@ m87 status
 ```
 
 The wizard initializes local state, lets you use auto-detect or pick a detected AI agent, connects GitHub or skips source setup, and finishes by choosing whether M87 runs in the background at login, for this session only, or later.
+If M87 is already running, the final step says so and changes the choice to keeping it running at login, keeping it running for this session only, or stopping it.
 For CI, release validation, or agent-driven setup, use headless flags instead:
 
 ```sh
@@ -188,6 +189,8 @@ m87 audit receipt <approval-id>
 
 Manual `plugin add`, `plugin configure`, and `daemon start` remain available when you need to bypass setup.
 Detached and managed daemons write operational logs to `~/.m87/daemon.log`, which is the first place to check for source sync failures or recovery.
+Installing the managed service stops any session daemon first, then lets the service own the background process so only one daemon works on the local state.
+If a daemon restart cannot stop the old process within its stop window, the command fails with `stop_failed` instead of starting another daemon.
 Failed GitHub syncs are retried with backoff, so a transient `gh` auth or network failure should recover after credentials or connectivity return.
 Use `--github-owned` to sync source repositories for `--github-username`, or `--github-authored-external` to sync recently updated issues and PRs authored by that user outside explicitly configured repositories.
 GitHub approvals can create real comments, reviews, close/reopen state changes, and other source-visible effects declared by the plugin action catalog.
