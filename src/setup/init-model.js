@@ -31,6 +31,7 @@ export function defaultInitSelections(overrides = {}) {
     githubRepoInput: "",
     githubUsername: "",
     installService: true,
+    uninstallService: false,
     startDaemon: true,
     stopDaemon: false,
     choiceIndex: 0,
@@ -199,7 +200,7 @@ export function buildInitApplyPlan(input = {}, context = {}) {
 
   const daemonRunning = Boolean(context.daemonPid);
   const uninstallService =
-    Boolean(context.serviceInstalled) && !selections.installService;
+    Boolean(context.serviceInstalled) && Boolean(selections.uninstallService);
   if (selections.installService) {
     sideEffects.push({
       id: "service",
@@ -236,6 +237,12 @@ export function buildInitApplyPlan(input = {}, context = {}) {
       label: "Stop M87 until you start it again",
     });
     commands.unshift("m87 daemon stop");
+  } else if (uninstallService) {
+    sideEffects.push({
+      id: "service-uninstall",
+      label: "Stop launching M87 automatically at startup",
+    });
+    commands.unshift("m87 daemon uninstall");
   }
 
   return {
@@ -429,20 +436,25 @@ function reviewChoices(selections, context) {
     {
       id: "service",
       label: "Start now & launch at login",
-      detail:
-        "Recommended. Syncs in the background now and after every restart.",
+      detail: context.serviceInstalled
+        ? "Recommended. Keeps your current startup setup and starts M87 now."
+        : "Recommended. Syncs in the background now and after every restart.",
       selected: selections.installService,
     },
     {
       id: "session",
       label: "Start now (this session only)",
-      detail: "Runs in the background until you restart your computer.",
+      detail: context.serviceInstalled
+        ? "Starts M87 now and stops launching automatically at startup."
+        : "Runs in the background until you restart your computer.",
       selected: !selections.installService && selections.startDaemon,
     },
     {
       id: "none",
       label: "Don't start it yet",
-      detail: "You can start M87 yourself later.",
+      detail: context.serviceInstalled
+        ? "Does not start M87 and stops launching automatically at startup."
+        : "You can start M87 yourself later.",
       selected: !selections.installService && !selections.startDaemon,
     },
   ];

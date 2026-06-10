@@ -75,6 +75,22 @@ describe("e2e: init wizard command contract", () => {
     expect(initialized.commands).toContain("m87");
   });
 
+  it("does not remove an existing startup setup in headless service opt-out", async () => {
+    const installed = parse(await m87("daemon", "install"));
+    expect(existsSync(installed.unit)).toBe(true);
+
+    const initialized = parse(
+      await m87("init", "--yes", "--no-install-service"),
+    );
+
+    expect(initialized).toMatchObject({
+      status: "initialized",
+      mode: "headless",
+      service_uninstall: { status: "skipped" },
+    });
+    expect(existsSync(installed.unit)).toBe(true);
+  });
+
   it("can configure GitHub with flags only", async () => {
     const initialized = parse(
       await m87(

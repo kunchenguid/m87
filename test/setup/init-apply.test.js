@@ -219,6 +219,7 @@ describe("init apply daemon lifecycle", () => {
         {
           ...defaultInitSelections(),
           installService: false,
+          uninstallService: true,
           startDaemon: true,
         },
         { daemonPid: child.pid, serviceInstalled: true },
@@ -256,6 +257,7 @@ describe("init apply daemon lifecycle", () => {
         {
           ...defaultInitSelections(),
           installService: false,
+          uninstallService: true,
           startDaemon: false,
           stopDaemon: true,
         },
@@ -286,6 +288,7 @@ describe("init apply daemon lifecycle", () => {
       {
         ...defaultInitSelections(),
         installService: false,
+        uninstallService: true,
         startDaemon: true,
       },
       { serviceInstalled: true },
@@ -322,6 +325,7 @@ describe("init apply daemon lifecycle", () => {
         {
           ...defaultInitSelections(),
           installService: false,
+          uninstallService: true,
           startDaemon: false,
           stopDaemon: true,
         },

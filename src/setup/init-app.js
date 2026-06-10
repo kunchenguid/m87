@@ -42,6 +42,7 @@ function applyChoice(state, choiceId) {
       return {
         ...state,
         installService: true,
+        uninstallService: false,
         startDaemon: true,
         stopDaemon: false,
       };
@@ -50,6 +51,7 @@ function applyChoice(state, choiceId) {
       return {
         ...state,
         installService: false,
+        uninstallService: true,
         startDaemon: true,
         stopDaemon: false,
       };
@@ -58,6 +60,7 @@ function applyChoice(state, choiceId) {
     return {
       ...state,
       installService: false,
+      uninstallService: true,
       startDaemon: false,
       stopDaemon: choiceId === "stop",
     };

@@ -318,7 +318,11 @@ async function applyInitSelections(selections, context, mode) {
     cliEntry: CLI_ENTRY,
   });
   result.mode = mode;
-  if (result.status === "unsupported" || result.status === "stop_failed") {
+  if (
+    result.status === "unsupported" ||
+    result.status === "stop_failed" ||
+    result.status === "deactivate_failed"
+  ) {
     process.exitCode = 1;
   }
   out(result);

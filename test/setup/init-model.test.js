@@ -115,7 +115,11 @@ describe("setup/init model", () => {
 
   it("plans startup removal when choosing session-only with startup enabled", () => {
     const plan = buildInitApplyPlan(
-      { ...defaultInitSelections(), installService: false },
+      {
+        ...defaultInitSelections(),
+        installService: false,
+        uninstallService: true,
+      },
       { ...runningContext, serviceInstalled: true },
     );
     expect(plan.daemon.uninstallService).toBe(true);
@@ -130,6 +134,7 @@ describe("setup/init model", () => {
     const selections = {
       ...defaultInitSelections(),
       installService: false,
+      uninstallService: true,
       startDaemon: false,
       stopDaemon: true,
     };
@@ -144,10 +149,46 @@ describe("setup/init model", () => {
     expect(plan.commands).toContain("m87 daemon stop");
   });
 
+  it("plans startup removal when choosing not to start with startup enabled", () => {
+    const plan = buildInitApplyPlan(
+      {
+        ...defaultInitSelections(),
+        installService: false,
+        uninstallService: true,
+        startDaemon: false,
+      },
+      { ...context, serviceInstalled: true },
+    );
+
+    expect(plan.daemon.uninstallService).toBe(true);
+    expect(plan.daemon.startDaemon).toBe(false);
+    expect(plan.sideEffects.map((e) => e.id)).toContain("service-uninstall");
+    expect(plan.commands).toContain("m87 daemon uninstall");
+    expect(plan.commands).not.toContain("m87 daemon start");
+  });
+
+  it("does not remove startup setup from headless service opt-out", () => {
+    const plan = buildInitApplyPlan(
+      {
+        ...defaultInitSelections(),
+        installService: false,
+        startDaemon: false,
+      },
+      { ...context, serviceInstalled: true },
+    );
+
+    expect(plan.daemon.uninstallService).toBe(false);
+    expect(plan.sideEffects.map((e) => e.id)).not.toContain(
+      "service-uninstall",
+    );
+    expect(plan.commands).not.toContain("m87 daemon uninstall");
+  });
+
   it("plans startup removal before stop when startup is enabled", () => {
     const selections = {
       ...defaultInitSelections(),
       installService: false,
+      uninstallService: true,
       startDaemon: false,
       stopDaemon: true,
     };
