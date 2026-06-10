@@ -134,6 +134,36 @@ describe("init apply daemon lifecycle", () => {
     }
   });
 
+  it("reports init failure when service handover stop fails", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    const realKill = process.kill;
+    const kill = vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+      if (pid === 4242) return true;
+      return realKill(pid, signal);
+    });
+    writeFileSync(join(stateDir, "daemon.pid"), "4242");
+    vi.useFakeTimers();
+
+    try {
+      const resultPromise = apply(defaultInitSelections());
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.status).toBe("stop_failed");
+      expect(result.daemon).toEqual({ status: "stopping", pid: 4242 });
+      expect(result.service).toEqual({
+        status: "stop_failed",
+        manager: servicePlan.manager,
+        label: servicePlan.label,
+        unit: servicePlan.unitPath,
+      });
+      expect(existsSync(servicePlan.unitPath)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      kill.mockRestore();
+    }
+  });
+
   it("stops an already service-managed daemon on reinstall", async () => {
     const servicePlan = getServicePlan(stateDir, cliEntry);
     mkdirSync(dirname(servicePlan.unitPath), { recursive: true });

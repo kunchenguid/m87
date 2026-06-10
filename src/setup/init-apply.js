@@ -98,6 +98,9 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
     const { stopped, ...service } = await installManagedService(cliEntry);
     result.service = service;
     if (stopped) result.daemon = stopped;
+    if (service.status === "stop_failed" || service.status === "unsupported") {
+      result.status = service.status;
+    }
   } else if (plan.daemon.startDaemon) {
     result.daemon = startDetachedDaemon(cliEntry);
   } else if (plan.daemon.stopDaemon) {
