@@ -162,6 +162,23 @@ function parseConfigPairs(pairs = []) {
   return config;
 }
 
+export function hasUsableAutomation(automationJson) {
+  if (!automationJson) {
+    return false;
+  }
+  try {
+    const automation = JSON.parse(automationJson);
+    return Boolean(
+      typeof automation?.kind === "string" &&
+      automation.kind.trim() &&
+      typeof automation?.prompt === "string" &&
+      automation.prompt.trim(),
+    );
+  } catch {
+    return false;
+  }
+}
+
 const program = new Command();
 program
   .name("m87")
@@ -778,7 +795,7 @@ program
     // a terminal item state; otherwise just confirm the approval landed.
     const approvalId = `approval-${recommendationId}`;
     const willSettle =
-      actions.length > 0 || Boolean(target.option.automation_json);
+      actions.length > 0 || hasUsableAutomation(target.option.automation_json);
     const settled = await pollFor(() => {
       const it = db
         .prepare("select local_state from items where id=?")

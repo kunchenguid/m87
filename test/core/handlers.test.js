@@ -219,6 +219,46 @@ describe("core/handlers", () => {
     expect(names).not.toContain("job.created");
   });
 
+  it("approval of a prompt-only legacy automation block queues no job", () => {
+    seedItem(db);
+    project(
+      db,
+      makeEvent({
+        actor: "agent",
+        entity: "recommendation",
+        lifecycle: "created",
+        item_id: ITEM,
+        payload: {
+          type: "triage_result",
+          recommendation_id: "rec-1",
+          summary: "s",
+          options: [
+            {
+              title: "Fix",
+              actions: [],
+              automation: { prompt: "fix it" },
+            },
+          ],
+        },
+      }),
+    );
+    const e = makeEvent({
+      actor: "user",
+      entity: "approval",
+      lifecycle: "created",
+      item_id: ITEM,
+      payload: {
+        type: "approved",
+        approval_id: "ap-1",
+        recommendation_id: "rec-1",
+        option_id: "rec-1-opt-0",
+        decision: "approved",
+      },
+    });
+    const { children } = runChain(db, e);
+    expect(children).toHaveLength(0);
+  });
+
   it("gateCheck throws when the approved option does not exist", () => {
     seedItem(db);
     const e = makeEvent({
