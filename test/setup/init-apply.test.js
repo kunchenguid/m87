@@ -134,18 +134,27 @@ describe("init apply daemon lifecycle", () => {
     }
   });
 
-  it("leaves an already service-managed daemon running on reinstall", async () => {
+  it("stops an already service-managed daemon on reinstall", async () => {
     const servicePlan = getServicePlan(stateDir, cliEntry);
     mkdirSync(dirname(servicePlan.unitPath), { recursive: true });
     writeFileSync(servicePlan.unitPath, "existing unit");
-    // If apply wrongly tried to stop this "daemon", it would signal the test
-    // process itself - a loud failure.
-    writeFileSync(join(stateDir, "daemon.pid"), String(process.pid));
+    const child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
 
-    const result = await apply(defaultInitSelections());
+    try {
+      const result = await apply(defaultInitSelections());
 
-    expect(result.daemon).toEqual({ status: "not_started" });
-    expect(result.service.status).toBe("installed");
+      expect(result.daemon).toMatchObject({
+        status: "stopped",
+        pid: child.pid,
+      });
+      expect(result.service.status).toBe("installed");
+    } finally {
+      if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
   });
 
   it("reports not_running when stopping with no daemon up", async () => {

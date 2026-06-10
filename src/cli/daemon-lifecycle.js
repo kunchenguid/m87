@@ -85,9 +85,8 @@ export function startDetachedDaemon(cliEntry) {
 // Write and activate the managed login service. A session daemon and the
 // service-spawned daemon would fight over the pid file and control socket
 // (the newcomer silently hijacks both, orphaning the older process while the
-// service manager keeps its own instance alive), so a running session daemon
-// is gracefully stopped first and the service owns the process from then on.
-// A daemon that is already service-managed (unit file present) is left alone.
+// service manager keeps its own instance alive), so any running daemon is
+// gracefully stopped first and the service owns the process from then on.
 export async function installManagedService(cliEntry) {
   const { stateDir } = getStatePaths();
   const plan = getServicePlan(stateDir, cliEntry);
@@ -95,9 +94,7 @@ export async function installManagedService(cliEntry) {
     return { status: "unsupported", platform: process.platform };
   }
   const stopped =
-    !existsSync(plan.unitPath) && runningDaemonPid() !== null
-      ? await gracefulStopDaemon()
-      : null;
+    runningDaemonPid() !== null ? await gracefulStopDaemon() : null;
   if (stopped?.status === "stopping") {
     return {
       status: "stop_failed",
