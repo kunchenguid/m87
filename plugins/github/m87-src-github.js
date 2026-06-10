@@ -1489,7 +1489,7 @@ const getNoMistakesBin = () =>
     ? process.env.M87_NO_MISTAKES_BIN
     : "no-mistakes";
 
-const runNoMistakes = async (args, cwd) => {
+const runNoMistakes = async (args, cwd, options = {}) => {
   const bin = getNoMistakesBin();
   // Same shim rule as runGh: a Node-script fake can't be exec'd on Windows.
   const [command, commandArgs] = /\.[mc]?js$/i.test(bin)
@@ -1499,14 +1499,14 @@ const runNoMistakes = async (args, cwd) => {
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024,
     cwd,
-    timeout: 120000,
+    timeout: options.timeout ?? 120000,
   });
   return stdout;
 };
 
 const noMistakesAvailable = async () => {
   try {
-    await runNoMistakes(["--version"]);
+    await runNoMistakes(["--version"], undefined, { timeout: 5000 });
     return true;
   } catch {
     return false;

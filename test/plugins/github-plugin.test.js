@@ -1321,6 +1321,47 @@ describe("github source plugin (contract v2)", () => {
     ).rejects.toThrow();
   });
 
+  test("submit with fix_pr_create=auto falls back when no-mistakes probe hangs", async () => {
+    const ws = await writeWorkspaceWithChange();
+    const bare = await mkdtemp(join(tmpdir(), "m87-fix-remote-"));
+    await execFileAsync("git", ["init", "-q", "--bare"], { cwd: bare });
+    await execFileAsync("git", ["remote", "add", "origin", bare], { cwd: ws });
+    const { fakeBinPath, callsPath } = await writeFakeNoMistakes([
+      'if (args[0] === "--version") { setTimeout(() => {}, 120000); }',
+    ]);
+    const { fakeGhPath } = await writeFakeGh([
+      'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',
+      'if (args[0] === "pr" && args[1] === "create") { process.stdout.write("https://github.com/kunchenguid/m87/pull/101"); process.exit(0); }',
+    ]);
+    const { stdout } = await runPluginWithInput(
+      ["submit-automation-workspace"],
+      `${JSON.stringify({
+        job: {
+          id: "job-1",
+          item_external_id: "github:issue:kunchenguid/m87/7",
+          item_title: "Crash on empty config",
+          prompt: "Guard against an empty config object.",
+          role: "maintainer",
+        },
+        workspace_path: ws,
+        config: { fix_pr_create: "auto" },
+      })}\n`,
+      {
+        ...process.env,
+        M87_GH_BIN: fakeGhPath,
+        M87_NO_MISTAKES_BIN: fakeBinPath,
+      },
+    );
+    const result = JSON.parse(stdout);
+    expect(result.status).toBe("submitted");
+    expect(result.pr_url).toBe("https://github.com/kunchenguid/m87/pull/101");
+    const nmCalls = (await readFile(callsPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(nmCalls).toEqual([["--version"]]);
+  }, 15000);
+
   test("submit with fix_pr_create=no-mistakes reports waiting_for_pr until the pipeline opens it", async () => {
     const ws = await writeWorkspaceWithChange();
     const gate = await mkdtemp(join(tmpdir(), "m87-fix-gate-"));
