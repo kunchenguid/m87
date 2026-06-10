@@ -26,7 +26,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
 }));
 
 const { applyInitPlan } = await import("../../src/setup/init-apply.js");
-const { startDetachedDaemon } =
+const { installManagedService, startDetachedDaemon } =
   await import("../../src/cli/daemon-lifecycle.js");
 const { buildInitApplyPlan, defaultInitSelections } =
   await import("../../src/setup/init-model.js");
@@ -102,6 +102,35 @@ describe("init apply daemon lifecycle", () => {
       );
     } finally {
       if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
+
+  it("does not install the managed service when handover stop fails", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    const realKill = process.kill;
+    const kill = vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+      if (pid === 4242) return true;
+      return realKill(pid, signal);
+    });
+    writeFileSync(join(stateDir, "daemon.pid"), "4242");
+    vi.useFakeTimers();
+
+    try {
+      const resultPromise = installManagedService(cliEntry);
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toEqual({
+        status: "stop_failed",
+        manager: servicePlan.manager,
+        label: servicePlan.label,
+        unit: servicePlan.unitPath,
+        stopped: { status: "stopping", pid: 4242 },
+      });
+      expect(existsSync(servicePlan.unitPath)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      kill.mockRestore();
     }
   });
 

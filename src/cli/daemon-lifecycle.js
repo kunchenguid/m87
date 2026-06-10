@@ -98,6 +98,15 @@ export async function installManagedService(cliEntry) {
     !existsSync(plan.unitPath) && runningDaemonPid() !== null
       ? await gracefulStopDaemon()
       : null;
+  if (stopped?.status === "stopping") {
+    return {
+      status: "stop_failed",
+      manager: plan.manager,
+      label: plan.label,
+      unit: plan.unitPath,
+      stopped,
+    };
+  }
   await mkdir(dirname(plan.unitPath), { recursive: true });
   await writeFile(plan.unitPath, plan.content);
   let activation = "skipped_dry_run";

@@ -1557,7 +1557,9 @@ daemon
   .description("Install the daemon as a managed OS service (start at login)")
   .action(async () => {
     const result = await installManagedService(CLI_ENTRY);
-    if (result.status === "unsupported") process.exitCode = 1;
+    if (result.status === "unsupported" || result.status === "stop_failed") {
+      process.exitCode = 1;
+    }
     out(result);
   });
 
