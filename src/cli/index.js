@@ -63,6 +63,7 @@ import {
   defaultInitSelections,
   validateInitSelections,
 } from "../setup/init-model.js";
+import { hasUsableAutomation } from "./automation.js";
 
 const CLI_ENTRY = fileURLToPath(import.meta.url);
 
@@ -778,7 +779,7 @@ program
     // a terminal item state; otherwise just confirm the approval landed.
     const approvalId = `approval-${recommendationId}`;
     const willSettle =
-      actions.length > 0 || Boolean(target.option.automation_json);
+      actions.length > 0 || hasUsableAutomation(target.option.automation_json);
     const settled = await pollFor(() => {
       const it = db
         .prepare("select local_state from items where id=?")

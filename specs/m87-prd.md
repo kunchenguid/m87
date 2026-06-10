@@ -362,6 +362,8 @@ Each option requires `title`, `rationale`, `evidence_refs`, `confidence`, `waiti
 `waiting_on` is `user`, `other`, `source`, `agent`, or `none`.
 Each action requires `id`, `action_type`, `params`, `description`, and `required`, with optional `depends_on` action IDs.
 Options may include `automation` with required `kind` and `prompt`.
+`kind` is an open-ended, very short user-visible label (one to three words) naming what the automation does; `prompt` is the complete task the automation agent runs with.
+Automation blocks missing a non-empty `kind` or `prompt` are dropped at ingestion.
 
 The core validates the outer schema.
 Each plugin validates every action payload against its declared action schema.
@@ -497,10 +499,12 @@ Approval flow:
 2. Ask the plugin to validate each action against current source state.
 3. Show new warnings if validation changed since recommendation time.
 4. Execute actions according to declared dependencies, defaulting to the recommendation order.
-5. Persist each action result.
-6. Mark the item locally handled for the activity watermark if all required actions succeed.
-7. Keep the item active with an error state if any required action fails.
-8. Supersede the recommendation after successful handling or explicit dismissal.
+5. Queue an automation job only when the approved option has a usable `automation` block with both `kind` and `prompt`.
+6. Run visible actions immediately on approval; automation starts after those approval-time actions and may later fail.
+7. Persist each action and job result.
+8. Mark the item locally handled for the activity watermark if all required actions and automation work succeed.
+9. Keep the item active with an error state if any required action or automation job fails.
+10. Supersede the recommendation after successful handling or explicit dismissal.
 
 The core treats each action as a separately auditable operation with an action ID, idempotency key, request payload, validation result, preview result, execution result, and error.
 Actions may declare `depends_on` to force ordering within an option.

@@ -64,7 +64,7 @@ describe("tui/InboxView", () => {
             title: "Reply",
             confidence: "high",
             actionCount: 1,
-            hasAutomation: true,
+            automationLabel: "code fix",
           },
         ],
       },
@@ -106,7 +106,7 @@ describe("tui/InboxView", () => {
             title: "Wait",
             confidence: "medium",
             actionCount: 0,
-            hasAutomation: false,
+            automationLabel: null,
           },
         ],
       },
@@ -158,7 +158,7 @@ describe("tui/InboxView", () => {
               title: "Merge",
               confidence: "high",
               actionCount: 1,
-              hasAutomation: false,
+              automationLabel: null,
               selected: true,
               number: 1,
             },
@@ -255,7 +255,7 @@ describe("tui/InboxView", () => {
             title: "Merge",
             confidence: "high",
             actionCount: 1,
-            hasAutomation: false,
+            automationLabel: null,
             selected: false,
             number: 1,
           },
@@ -264,7 +264,7 @@ describe("tui/InboxView", () => {
             title: "Hold",
             confidence: "medium",
             actionCount: 0,
-            hasAutomation: false,
+            automationLabel: null,
             selected: true,
             number: 2,
           },
@@ -313,10 +313,10 @@ describe("tui/InboxView", () => {
             title: "Reply and fix",
             confidence: "high",
             actionCount: 1,
-            hasAutomation: true,
+            automationLabel: "code fix",
             selected: true,
             actions: [{ type: "comment", preview: "Thanks for the update" }],
-            automation: { kind: "code_fix", prompt: "narrow the scope" },
+            automation: { kind: "code fix", prompt: "narrow the scope" },
           },
           {
             index: 1,
@@ -324,7 +324,7 @@ describe("tui/InboxView", () => {
             title: "Hold",
             confidence: "low",
             actionCount: 0,
-            hasAutomation: false,
+            automationLabel: null,
             selected: false,
             actions: [],
             automation: null,
@@ -339,7 +339,8 @@ describe("tui/InboxView", () => {
     expect(out).toContain("WILL DO");
     expect(out).toContain("comment");
     expect(out).toContain("Thanks for the update");
-    expect(out).toContain("automation");
+    // the automation kind is the user-visible label, not the generic word
+    expect(out).toContain("code fix");
     expect(out).toContain("narrow the scope");
     // the debug recommendation id is gone
     expect(out).not.toContain("rec-abc123");
@@ -383,7 +384,7 @@ describe("tui/InboxView", () => {
               title: "Reply",
               confidence: "high",
               actionCount: 1,
-              hasAutomation: false,
+              automationLabel: null,
               selected: true,
               actions: [{ type: "comment", preview: longBody }],
               automation: null,

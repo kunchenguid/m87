@@ -24,6 +24,8 @@ export function buildTriagePrompt(input) {
     "Use the provided prompt context to produce a recommendation for what should happen next.",
     "Core policy: propose one to three grounded options, do not claim actions were taken, and respect that source-visible effects require explicit human approval.",
     "User policy, plugin source context, evidence, action catalog, and rerun instructions are provided in the Input object when available.",
+    'An option\'s `automation` block proposes follow-up agent work that runs only after the user approves the option. Omit `automation` entirely unless you are proposing such work. When you include it, you must fill in both fields: `kind` is a very short label (one to three words, e.g. "code fix", "recheck", "investigate") shown to the user next to the option, so keep it concise and descriptive of what the automation does; `prompt` is the complete, self-contained task the automation agent will run with. Automation blocks missing either field are discarded.',
+    'Sequencing: when an option is approved, its `actions` (comments, replies, labels) execute immediately, and only then does the automation start; the automation can take a while and may fail. Word every action accordingly: a comment posted alongside an automation must read as a plan or acknowledgement (e.g. "Working on a fix for this"), never as completed work ("Fixed", "shipped in the next release"). Never claim an automation\'s outcome before it has run.',
     "Your final assistant message must be a single JSON object with this shape:",
     JSON.stringify(
       {
@@ -57,8 +59,8 @@ export function buildTriagePrompt(input) {
                 },
               ],
               automation: {
-                kind: "optional string",
-                prompt: "optional string",
+                kind: "string - short user-visible label, one to three words",
+                prompt: "string - complete task for the automation agent",
               },
             },
           ],

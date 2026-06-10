@@ -48,8 +48,10 @@ The current core queues fix jobs from recommendation options that include `autom
 
 ### `prepare-automation-workspace`
 
-Input: `{ config, job: { id, kind, item_external_id } }`.
+Input: `{ config, job: { id, kind, item_external_id, item_title, option_title, prompt, role } }`.
 Output: `{ status, workspace_path, base_ref, branch, warnings }`.
+
+The `item_title`, `option_title`, and `prompt` fields carry human context from the approved recommendation so the plugin can write human-facing commit messages and PR titles/bodies instead of leaking internal job ids.
 
 The plugin clones or worktrees the repo into a path it controls (mirroring ezoss's persistent investigations checkout plus an ephemeral per-job worktree), creates the fix branch, and returns the absolute `workspace_path` for the core to run the agent in.
 `status` is `prepared` or `failed`.
@@ -62,6 +64,18 @@ Output: `{ status, pr_url, commit, warnings, error }`.
 The plugin stages and commits any agent changes, pushes the branch, and opens a draft PR, returning the PR URL.
 It must be idempotent on `idempotency_key` (re-running a submit for the same job must not open a second PR) and must verify the branch actually has commits ahead of `base_ref` before pushing.
 `status` is `submitted`, `no_changes`, `waiting_for_pr`, or `failed`.
+
+#### Submission modes (GitHub plugin)
+
+How a maintainer fix leaves the workspace is plugin policy, configured per scope, because push/PR mechanics are source-specific and the core must stay source-agnostic.
+The GitHub plugin supports `fix_pr_create`: `auto` (default), `no-mistakes`, `gh`, or `disabled`, mirroring ezoss's `fixes.pr_create`.
+`auto` prefers no-mistakes when the binary is on PATH and falls back to `gh` otherwise (or when the no-mistakes push fails).
+
+no-mistakes is a local git proxy, not a `gh` replacement: the plugin ensures the gate remote exists (`git remote get-url no-mistakes`, running `no-mistakes init` when missing) and then runs `git push no-mistakes HEAD:<branch>`.
+The pipeline validates the change and opens the PR asynchronously, so the submit returns `waiting_for_pr` when the PR is not yet detectable and `m87 job attach` re-detects it later.
+Contributor pushes have the analogous `fix_contrib_push` modes: `auto`, `no-mistakes` (default: leave the commit for manual review), or `disabled`.
+
+The commit subject doubles as the PR title on paths that derive the PR from the commit (no-mistakes), so the plugin writes a human-facing commit message from the job's `item_title`/`option_title`/`prompt` context rather than internal job ids.
 
 ### `detect-automation-pr`
 
@@ -116,9 +130,7 @@ Usage and token accounting flow through the existing `agent_runs` plumbing, with
 
 The human-approval boundary is satisfied at queue time: a job only exists because the user approved an option whose `automation` block created it.
 The job's remote effect is constrained to a **draft** PR, which is reviewable and reversible, not a merge or a comment to another person.
-
-Open decision: whether opening the draft PR needs a second explicit confirmation, or whether approval-at-queue-time plus draft-only is sufficient.
-Recommendation for MVP: draft-only, audited, no second prompt, with a plugin config gate (`fixes.enabled`, `fixes.pr_create: draft | disabled`) mirroring ezoss, so a cautious user can run "prepare + agent, but commit only / no PR."
+There is no second approval prompt before the draft PR; cautious users control submission policy through source-plugin config such as GitHub's `fix_pr_create` and `fix_contrib_push`.
 
 ## Failure, Recovery, Idempotency
 
@@ -137,17 +149,13 @@ Offline by default, mirroring the existing e2e style.
 - A GitHub-plugin contract test for the two new commands against recorded fixtures (no live network).
 - ACP `cwd` is exercised by pointing the mock ACP target at the prepared workspace and asserting it ran there.
 
-## Suggested Phasing
+## Implemented Phasing
 
-1. Core job runner + state machine + daemon Stage C, proven end-to-end with the **mock** plugin only (no GitHub yet). This is the bulk of the core work and is fully offline-testable.
-2. ACP `cwd` parameterization.
-3. GitHub plugin `prepare`/`submit` (worktree + `gh pr create --draft`), with recorded fixtures.
-4. Config gates (`fixes.*`), workspace retention, and the second-approval decision.
+1. Core job runner + state machine + daemon Stage C, proven end-to-end with the mock plugin.
+2. ACP `cwd` parameterization so the coding agent edits the prepared workspace.
+3. GitHub plugin `prepare`/`submit` with maintainer draft PRs, no-mistakes gate support, contributor manual-review flow, and delayed PR detection.
+4. Submission policy gates through `fix_pr_create` and `fix_contrib_push`.
 
-Phase 1 alone makes "fix jobs actually run" true for the abstraction; phase 3 makes it true for GitHub.
+## Remaining Questions
 
-## Open Questions
-
-- Second approval before the draft PR, or draft-only + audit?
 - Persistent per-repo checkout (ezoss-style investigations dir) versus a fresh clone per job - persistent is faster but adds state to manage.
-- Should `submit` always open a PR, or support a "commit to a branch, no PR" mode for users who push through their own tooling (e.g. no-mistakes)?

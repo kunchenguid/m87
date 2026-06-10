@@ -207,7 +207,7 @@ function OptionCard({ opt, width }) {
   const actionTag = opt.actionCount
     ? ` ${opt.actionCount} action${opt.actionCount === 1 ? "" : "s"}`
     : "";
-  const autoTag = opt.hasAutomation ? "  ⚙ automation" : "";
+  const autoTag = opt.automationLabel ? `  ⚙ ${opt.automationLabel}` : "";
   // Pad the confidence label to a fixed width so every option's title starts in
   // the same column - the pills read as an aligned meter down the pane.
   const label = (opt.confidence ?? "").padEnd(6);

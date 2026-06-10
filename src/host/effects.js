@@ -41,6 +41,18 @@ function loadItem(db, itemId) {
   return db.prepare("select * from items where id = ?").get(itemId);
 }
 
+// An automation block is only usable when the agent filled in both required
+// fields: `kind` (the short user-visible label) and `prompt` (the task the
+// automation agent runs with). Anything else is dropped here so a degenerate
+// block can never reach approval and queue an empty job.
+export function normalizeAutomation(automation) {
+  const kind =
+    typeof automation?.kind === "string" ? automation.kind.trim() : "";
+  const prompt =
+    typeof automation?.prompt === "string" ? automation.prompt.trim() : "";
+  return kind && prompt ? { kind, prompt } : null;
+}
+
 /**
  * Build the four effect runners, closing over the daemon context.
  * @param {{ db, stateDir, config?, agentSpec?, logger? }} ctx
@@ -260,7 +272,7 @@ export function createEffects(ctx) {
             confidence: o.confidence ?? "medium",
             waiting_on: o.waiting_on ?? "none",
             actions: o.actions ?? [],
-            automation: o.automation ?? null,
+            automation: normalizeAutomation(o.automation),
           })),
         },
       });
@@ -327,10 +339,20 @@ export function createEffects(ctx) {
     const pconfig = parseJson(plugin.config_json, {});
     const automation = parseJson(job.metadata_json, {}).automation ?? {};
     const itemRole = parseJson(item.metadata_json, {}).role;
+    // Human context rides along so the plugin can write a human-facing commit
+    // message and PR title/body instead of leaking internal job ids.
+    const option = job.option_id
+      ? db
+          .prepare("select title from recommendation_options where id = ?")
+          .get(job.option_id)
+      : null;
     const jobRef = {
       id: job.id,
       kind: job.kind,
       item_external_id: item.external_id,
+      item_title: item.title ?? null,
+      option_title: option?.title ?? null,
+      prompt: automation.prompt ?? job.prompt ?? "",
       ...(typeof itemRole === "string" ? { role: itemRole } : {}),
     };
     try {

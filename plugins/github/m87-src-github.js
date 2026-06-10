@@ -1489,13 +1489,91 @@ const getNoMistakesBin = () =>
     ? process.env.M87_NO_MISTAKES_BIN
     : "no-mistakes";
 
+const runNoMistakes = async (args, cwd, options = {}) => {
+  const bin = getNoMistakesBin();
+  // Same shim rule as runGh: a Node-script fake can't be exec'd on Windows.
+  const [command, commandArgs] = /\.[mc]?js$/i.test(bin)
+    ? [process.execPath, [bin, ...args]]
+    : [bin, args];
+  const { stdout } = await execFileAsync(command, commandArgs, {
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+    cwd,
+    timeout: options.timeout ?? 120000,
+  });
+  return stdout;
+};
+
 const noMistakesAvailable = async () => {
   try {
-    await execFileAsync(getNoMistakesBin(), ["--version"], { timeout: 5000 });
+    await runNoMistakes(["--version"], undefined, { timeout: 5000 });
     return true;
   } catch {
     return false;
   }
+};
+
+// no-mistakes is a local git proxy: `init` registers a gate remote named
+// "no-mistakes" in the repository, and pushing to that remote runs the
+// validation pipeline, which pushes upstream and opens the PR when it passes.
+const pushThroughNoMistakes = async (workspacePath, branch) => {
+  try {
+    await runGit(["remote", "get-url", "no-mistakes"], workspacePath);
+  } catch {
+    await runNoMistakes(["init"], workspacePath);
+  }
+  await runGit(["push", "no-mistakes", `HEAD:${branch}`], workspacePath);
+};
+
+// Human-facing copy for a fix job's commit and pull request. The commit
+// subject doubles as the PR title on paths that derive the PR from the commit
+// (no-mistakes, gh --fill), so it leads with the item reference and title
+// rather than internal job ids.
+const fixCopy = (job, jobId) => {
+  const externalId =
+    job !== null && typeof job === "object"
+      ? Reflect.get(job, "item_external_id")
+      : null;
+  const issueRef =
+    typeof externalId === "string" ? parseIssueExternalId(externalId) : null;
+  const prRef =
+    typeof externalId === "string"
+      ? parsePullRequestExternalId(externalId)
+      : null;
+  const repository = issueRef?.repository ?? prRef?.repository ?? null;
+  const number = issueRef?.number ?? prRef?.number ?? null;
+  const itemTitle = getJobString(job, "item_title");
+  const optionTitle = getJobString(job, "option_title");
+  const prompt = getJobString(job, "prompt");
+
+  const ref = repository && number ? `${repository}#${number}` : null;
+  const title = itemTitle
+    ? `Fix${ref ? ` ${ref}` : ""}: ${itemTitle}`
+    : ref
+      ? `Fix ${ref}`
+      : `m87 automated fix (${jobId})`;
+
+  const bodyParts = [];
+  // A closing keyword only for issues; a PR item should not auto-close anything.
+  if (ref) {
+    bodyParts.push(issueRef ? `Fixes ${ref}.` : `For ${ref}.`);
+  }
+  if (optionTitle) {
+    bodyParts.push(`Approved option: ${optionTitle}`);
+  }
+  if (prompt) {
+    bodyParts.push(`Task:\n\n${prompt}`);
+  }
+  bodyParts.push(`Prepared by m87 from an approved recommendation (${jobId}).`);
+  const body = bodyParts.join("\n\n");
+
+  return { title, body, commitMessage: `${title}\n\n${body}` };
+};
+
+const getJobString = (job, key) => {
+  const value =
+    job !== null && typeof job === "object" ? Reflect.get(job, key) : null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 };
 
 // Detect the URL of a PR opened from a given head branch. Returns null when no
@@ -2250,11 +2328,9 @@ const main = async () => {
         return;
       }
 
+      const copy = fixCopy(job, jobId);
       await runGit(["add", "-A"], workspacePath);
-      await runGit(
-        ["commit", "-m", `m87 automated fix for job ${jobId}`],
-        workspacePath,
-      );
+      await runGit(["commit", "-m", copy.commitMessage], workspacePath);
       // Branch name is read after the commit so an unborn HEAD (fresh checkout
       // -b with no commit yet) does not trip `git rev-parse`.
       const branch = await currentBranch(workspacePath);
@@ -2354,17 +2430,24 @@ const main = async () => {
 
       if (effectiveMode === "no-mistakes") {
         try {
-          await execFileAsync(getNoMistakesBin(), ["push"], {
-            cwd: workspacePath,
-            timeout: 120000,
-          });
+          await pushThroughNoMistakes(workspacePath, branch);
         } catch (nmError) {
           if (prCreate === "auto") {
             // Fall back to gh when no-mistakes fails before PR detection.
             await runGit(["push", "-u", "origin", branch], workspacePath);
             const prUrl = (
               await runGh(
-                ["pr", "create", "--draft", "--fill", "--head", branch],
+                [
+                  "pr",
+                  "create",
+                  "--draft",
+                  "--head",
+                  branch,
+                  "--title",
+                  copy.title,
+                  "--body",
+                  copy.body,
+                ],
                 { cwd: workspacePath },
               )
             ).trim();
@@ -2407,13 +2490,12 @@ const main = async () => {
             "pr",
             "create",
             "--draft",
-            "--fill",
             "--head",
             branch,
             "--title",
-            `m87 fix: job ${jobId}`,
+            copy.title,
             "--body",
-            `Automated fix prepared by M87 for job ${jobId}.`,
+            copy.body,
           ],
           { cwd: workspacePath },
         )

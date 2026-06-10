@@ -142,7 +142,7 @@ describe("core/handlers", () => {
                   safety: "external_write",
                 },
               ],
-              automation: { prompt: "fix it" },
+              automation: { kind: "code fix", prompt: "fix it" },
             },
           ],
         },
@@ -167,6 +167,96 @@ describe("core/handlers", () => {
     expect(names).toContain("job.created");
     const action = children.find((c) => c.event.entity === "action");
     expect(action.event.payload.action_id).toBe("a1");
+  });
+
+  it("approval of a legacy option with an empty automation block queues no job", () => {
+    seedItem(db);
+    project(
+      db,
+      makeEvent({
+        actor: "agent",
+        entity: "recommendation",
+        lifecycle: "created",
+        item_id: ITEM,
+        payload: {
+          type: "triage_result",
+          recommendation_id: "rec-1",
+          summary: "s",
+          options: [
+            {
+              title: "Reply only",
+              actions: [
+                {
+                  id: "a1",
+                  action_type: "comment",
+                  required: true,
+                  safety: "external_write",
+                },
+              ],
+              // rows written before ingestion required kind+prompt
+              automation: {},
+            },
+          ],
+        },
+      }),
+    );
+    const e = makeEvent({
+      actor: "user",
+      entity: "approval",
+      lifecycle: "created",
+      item_id: ITEM,
+      payload: {
+        type: "approved",
+        approval_id: "ap-1",
+        recommendation_id: "rec-1",
+        option_id: "rec-1-opt-0",
+        decision: "approved",
+      },
+    });
+    const { children } = runChain(db, e);
+    const names = children.map((c) => `${c.event.entity}.${c.event.lifecycle}`);
+    expect(names).toContain("action.created");
+    expect(names).not.toContain("job.created");
+  });
+
+  it("approval of a prompt-only legacy automation block queues no job", () => {
+    seedItem(db);
+    project(
+      db,
+      makeEvent({
+        actor: "agent",
+        entity: "recommendation",
+        lifecycle: "created",
+        item_id: ITEM,
+        payload: {
+          type: "triage_result",
+          recommendation_id: "rec-1",
+          summary: "s",
+          options: [
+            {
+              title: "Fix",
+              actions: [],
+              automation: { prompt: "fix it" },
+            },
+          ],
+        },
+      }),
+    );
+    const e = makeEvent({
+      actor: "user",
+      entity: "approval",
+      lifecycle: "created",
+      item_id: ITEM,
+      payload: {
+        type: "approved",
+        approval_id: "ap-1",
+        recommendation_id: "rec-1",
+        option_id: "rec-1-opt-0",
+        decision: "approved",
+      },
+    });
+    const { children } = runChain(db, e);
+    expect(children).toHaveLength(0);
   });
 
   it("gateCheck throws when the approved option does not exist", () => {

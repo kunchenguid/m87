@@ -172,6 +172,15 @@ export function wrapText(text, width) {
   return lines;
 }
 
+// The user-visible label for an automation block is its agent-chosen `kind`
+// (e.g. "code fix", "recheck"). Rows written before kind became required fall
+// back to the generic word.
+export function automationLabel(automation) {
+  const kind =
+    typeof automation?.kind === "string" ? automation.kind.trim() : "";
+  return kind || "automation";
+}
+
 // Flatten the selected option's actions + automation into display lines for the
 // WILL DO section: a label line per action/automation, then its wrapped body. A
 // flat line list is what makes the section scrollable line-by-line.
@@ -184,7 +193,7 @@ export function willDoLines(opt, bodyWidth) {
     }
   }
   if (opt?.automation) {
-    lines.push({ kind: "automation", text: "automation" });
+    lines.push({ kind: "automation", text: automationLabel(opt.automation) });
     for (const wl of wrapText(opt.automation.prompt, bodyWidth)) {
       lines.push({ kind: "body", text: wl });
     }
@@ -304,7 +313,9 @@ export function buildInboxModel(
           title: opt.title,
           confidence: opt.confidence,
           actionCount: opt.actions.length,
-          hasAutomation: Boolean(opt.automation),
+          automationLabel: opt.automation
+            ? automationLabel(opt.automation)
+            : null,
           selected: index === optedIndex,
           // What this option will actually do, for the WILL DO detail section.
           actions: opt.actions.map((a) => ({
@@ -373,7 +384,7 @@ export function renderInboxView(db, opts = {}) {
     model.detail.options.forEach((opt) => {
       const tags = [];
       if (opt.actionCount) tags.push(`${opt.actionCount} action(s)`);
-      if (opt.hasAutomation) tags.push("automation");
+      if (opt.automationLabel) tags.push(opt.automationLabel);
       lines.push(
         `  (${opt.index}) ${opt.title}  [${opt.confidence}]${tags.length ? "  " + tags.join(", ") : ""}`,
       );

@@ -96,7 +96,7 @@ describe("tui/buildInboxModel", () => {
         title: "Reply",
         confidence: "high",
         actions: [{ id: "a1", action_type: "comment" }],
-        automation: { prompt: "x" },
+        automation: { kind: "code fix", prompt: "x" },
       },
       { title: "Close", confidence: "low", actions: [] },
     ]);
@@ -119,7 +119,7 @@ describe("tui/buildInboxModel", () => {
       title: "Reply",
       confidence: "high",
       actionCount: 1,
-      hasAutomation: true,
+      automationLabel: "code fix",
     });
   });
 
