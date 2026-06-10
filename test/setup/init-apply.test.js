@@ -19,9 +19,11 @@ const spawn = vi.hoisted(() =>
     unref: vi.fn(),
   })),
 );
+const execFileSync = vi.hoisted(() => vi.fn());
 
 vi.mock("node:child_process", async (importOriginal) => ({
   ...(await importOriginal()),
+  execFileSync,
   spawn,
 }));
 
@@ -58,6 +60,7 @@ describe("init apply daemon lifecycle", () => {
     process.env.HOME = homeDir;
     process.env.M87_SERVICE_DRY_RUN = "1";
     spawn.mockClear();
+    execFileSync.mockReset();
   });
 
   afterEach(() => {
@@ -265,6 +268,70 @@ describe("init apply daemon lifecycle", () => {
         status: "stopped",
         pid: child.pid,
       });
+    } finally {
+      if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
+
+  it("does not start a daemon when service deactivation fails", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    mkdirSync(dirname(servicePlan.unitPath), { recursive: true });
+    writeFileSync(servicePlan.unitPath, "existing unit");
+    process.env.M87_SERVICE_DRY_RUN = "0";
+    execFileSync.mockImplementation(() => {
+      throw new Error("deactivate failed");
+    });
+
+    const result = await apply(
+      {
+        ...defaultInitSelections(),
+        installService: false,
+        startDaemon: true,
+      },
+      { serviceInstalled: true },
+    );
+
+    expect(result.status).toBe("deactivate_failed");
+    expect(result.service_uninstall).toMatchObject({
+      status: "uninstalled",
+      manager: servicePlan.manager,
+      label: servicePlan.label,
+      unit: servicePlan.unitPath,
+      deactivation: "deactivate_failed",
+    });
+    expect(result.daemon).toEqual({ status: "not_started" });
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("does not stop the daemon when service deactivation fails", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    mkdirSync(dirname(servicePlan.unitPath), { recursive: true });
+    writeFileSync(servicePlan.unitPath, "existing unit");
+    const child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    process.env.M87_SERVICE_DRY_RUN = "0";
+    execFileSync.mockImplementation(() => {
+      throw new Error("deactivate failed");
+    });
+
+    try {
+      const result = await apply(
+        {
+          ...defaultInitSelections(),
+          installService: false,
+          startDaemon: false,
+          stopDaemon: true,
+        },
+        { daemonPid: child.pid, serviceInstalled: true },
+      );
+
+      expect(result.status).toBe("deactivate_failed");
+      expect(result.service_uninstall.deactivation).toBe("deactivate_failed");
+      expect(result.daemon).toEqual({ status: "not_started" });
+      expect(process.kill(child.pid, 0)).toBe(true);
     } finally {
       if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
     }

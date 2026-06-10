@@ -106,8 +106,15 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
   } else {
     if (plan.daemon.uninstallService) {
       result.service_uninstall = await uninstallManagedService(cliEntry);
-      if (result.service_uninstall.status === "unsupported") {
-        result.status = "unsupported";
+      if (
+        result.service_uninstall.status === "unsupported" ||
+        result.service_uninstall.deactivation === "deactivate_failed"
+      ) {
+        result.status =
+          result.service_uninstall.status === "unsupported"
+            ? "unsupported"
+            : "deactivate_failed";
+        return result;
       }
     }
     if (plan.daemon.startDaemon) {
