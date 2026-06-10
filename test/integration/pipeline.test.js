@@ -163,6 +163,39 @@ describe("integration: full pipeline with real mock plugin + acp-mock", () => {
     expect(rec2.root_event_id).toBe(itemCreated.id);
   });
 
+  it("drops automation blocks the agent left without a kind or prompt", async () => {
+    const response = JSON.parse(JSON.stringify(AGENT_RECOMMENDATION));
+    response.recommendation.options[0].automation = {};
+    response.recommendation.options.push({
+      title: "Reply only",
+      rationale: "Just acknowledge",
+      confidence: "medium",
+      waiting_on: "user",
+      actions: [],
+      automation: { kind: "code fix", prompt: "   " },
+    });
+    const target = await createMockAcpTarget(ws, { response });
+    const effects = createEffects({
+      db,
+      stateDir: ws.stateDir,
+      config: { acp_registry_overrides: { claude: target.executablePath } },
+      agentSpec: "acp:claude",
+    });
+    const loop = createLoop({ db, effects });
+    loop.launchEffect({ type: "sync", plugin_id: "mock" });
+    await loop.settle();
+    await loop.drain();
+
+    const rows = db
+      .prepare(
+        "select automation_json from recommendation_options order by position",
+      )
+      .all();
+    expect(rows).toHaveLength(2);
+    expect(rows[0].automation_json).toBeNull();
+    expect(rows[1].automation_json).toBeNull();
+  });
+
   it("a closed issue on the next sync folds the item to closed", async () => {
     const target = await createMockAcpTarget(ws, {
       response: AGENT_RECOMMENDATION,

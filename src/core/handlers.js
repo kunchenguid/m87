@@ -110,7 +110,13 @@ function fanOut(ctx) {
   const automation = option.automation_json
     ? JSON.parse(option.automation_json)
     : null;
-  if (automation) {
+  // Ingestion drops automation blocks without a prompt, but rows written
+  // before that rule may still carry one; an empty prompt cannot drive a job.
+  if (
+    automation &&
+    typeof automation.prompt === "string" &&
+    automation.prompt.trim()
+  ) {
     ctx.emit({
       actor: "core",
       entity: "job",

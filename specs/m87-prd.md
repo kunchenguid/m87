@@ -362,6 +362,8 @@ Each option requires `title`, `rationale`, `evidence_refs`, `confidence`, `waiti
 `waiting_on` is `user`, `other`, `source`, `agent`, or `none`.
 Each action requires `id`, `action_type`, `params`, `description`, and `required`, with optional `depends_on` action IDs.
 Options may include `automation` with required `kind` and `prompt`.
+`kind` is an open-ended, very short user-visible label (one to three words) naming what the automation does; `prompt` is the complete task the automation agent runs with.
+Automation blocks missing a non-empty `kind` or `prompt` are dropped at ingestion.
 
 The core validates the outer schema.
 Each plugin validates every action payload against its declared action schema.

@@ -1180,7 +1180,7 @@ describe("github source plugin (contract v2)", () => {
     expect(result.pr_url).toBeUndefined();
   });
 
-  test("submit with fix_pr_create=gh opens a draft PR", async () => {
+  test("submit with fix_pr_create=gh opens a draft PR with human-facing copy", async () => {
     const ws = await writeWorkspaceWithChange();
     const bare = await mkdtemp(join(tmpdir(), "m87-fix-remote-"));
     await execFileAsync("git", ["init", "-q", "--bare"], { cwd: bare });
@@ -1194,7 +1194,10 @@ describe("github source plugin (contract v2)", () => {
       `${JSON.stringify({
         job: {
           id: "job-1",
-          item_external_id: "github:pr:kunchenguid/m87/7",
+          item_external_id: "github:issue:kunchenguid/m87/7",
+          item_title: "Crash on empty config",
+          option_title: "Implement the fix: guard the empty config",
+          prompt: "Guard against an empty config object in loadConfig().",
           role: "maintainer",
         },
         workspace_path: ws,
@@ -1206,11 +1209,154 @@ describe("github source plugin (contract v2)", () => {
     expect(result.status).toBe("submitted");
     expect(result.pr_url).toBe("https://github.com/kunchenguid/m87/pull/99");
     const calls = await readGhCalls(callsPath);
-    expect(
-      calls.some(
-        (c) => c[0] === "pr" && c[1] === "create" && c.includes("--draft"),
+    const create = calls.find((c) => c[0] === "pr" && c[1] === "create");
+    expect(create).toContain("--draft");
+    expect(create[create.indexOf("--title") + 1]).toBe(
+      "Fix kunchenguid/m87#7: Crash on empty config",
+    );
+    const body = create[create.indexOf("--body") + 1];
+    expect(body).toContain("Fixes kunchenguid/m87#7.");
+    expect(body).toContain(
+      "Approved option: Implement the fix: guard the empty config",
+    );
+    expect(body).toContain(
+      "Guard against an empty config object in loadConfig().",
+    );
+    // The commit subject carries the same human title, not internal job ids.
+    const subject = (
+      await execFileAsync("git", ["log", "-1", "--format=%s"], { cwd: ws })
+    ).stdout.trim();
+    expect(subject).toBe("Fix kunchenguid/m87#7: Crash on empty config");
+  });
+
+  /**
+   * Write a fake `no-mistakes` executable (M87_NO_MISTAKES_BIN), mirroring
+   * writeFakeGh.
+   *
+   * @param {string[]} scriptLines
+   */
+  async function writeFakeNoMistakes(scriptLines) {
+    const tempDir = await mkdtemp(join(tmpdir(), "m87-nm-"));
+    const fakeBinPath = join(tempDir, "no-mistakes.mjs");
+    const callsPath = join(tempDir, "calls.jsonl");
+    await writeFile(
+      fakeBinPath,
+      [
+        "#!/usr/bin/env node",
+        'import { appendFileSync } from "node:fs";',
+        'import { execSync } from "node:child_process";',
+        "const args = process.argv.slice(2);",
+        `appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + "\\n");`,
+        ...scriptLines,
+        'process.stderr.write(`unexpected no-mistakes args: ${args.join(" ")}`);',
+        "process.exit(1);",
+        "",
+      ].join("\n"),
+    );
+    await chmod(fakeBinPath, 0o755);
+    return { fakeBinPath, callsPath };
+  }
+
+  test("submit with fix_pr_create=auto pushes through the no-mistakes gate", async () => {
+    const ws = await writeWorkspaceWithChange();
+    const origin = await mkdtemp(join(tmpdir(), "m87-fix-origin-"));
+    await execFileAsync("git", ["init", "-q", "--bare"], { cwd: origin });
+    await execFileAsync("git", ["remote", "add", "origin", origin], {
+      cwd: ws,
+    });
+    const gate = await mkdtemp(join(tmpdir(), "m87-fix-gate-"));
+    await execFileAsync("git", ["init", "-q", "--bare"], { cwd: gate });
+    // `init` registers the gate remote, exactly what the plugin runs when the
+    // remote is missing.
+    const { fakeBinPath, callsPath } = await writeFakeNoMistakes([
+      'if (args[0] === "--version") { process.stdout.write("9.9.9"); process.exit(0); }',
+      `if (args[0] === "init") { execSync("git remote add no-mistakes ${gate}", { cwd: process.cwd() }); process.exit(0); }`,
+    ]);
+    const { fakeGhPath } = await writeFakeGh([
+      'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',
+      'if (args[0] === "pr" && args[1] === "list") { process.stdout.write(JSON.stringify([{ url: "https://github.com/kunchenguid/m87/pull/100" }])); process.exit(0); }',
+    ]);
+    const { stdout } = await runPluginWithInput(
+      ["submit-automation-workspace"],
+      `${JSON.stringify({
+        job: {
+          id: "job-1",
+          item_external_id: "github:issue:kunchenguid/m87/7",
+          item_title: "Crash on empty config",
+          prompt: "Guard against an empty config object.",
+          role: "maintainer",
+        },
+        workspace_path: ws,
+        config: { fix_pr_create: "auto" },
+      })}\n`,
+      {
+        ...process.env,
+        M87_GH_BIN: fakeGhPath,
+        M87_NO_MISTAKES_BIN: fakeBinPath,
+      },
+    );
+    const result = JSON.parse(stdout);
+    expect(result.status).toBe("submitted");
+    expect(result.pr_url).toBe("https://github.com/kunchenguid/m87/pull/100");
+    const nmCalls = (await readFile(callsPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(nmCalls).toContainEqual(["init"]);
+    // The branch went through the gate remote, not directly to origin.
+    const gateBranch = (
+      await execFileAsync(
+        "git",
+        ["-C", gate, "rev-parse", "--verify", "m87/fix-job-1"],
+        {},
+      )
+    ).stdout.trim();
+    expect(gateBranch).toMatch(/^[0-9a-f]{40}$/);
+    await expect(
+      execFileAsync(
+        "git",
+        ["-C", origin, "rev-parse", "--verify", "m87/fix-job-1"],
+        {},
       ),
-    ).toBe(true);
+    ).rejects.toThrow();
+  });
+
+  test("submit with fix_pr_create=no-mistakes reports waiting_for_pr until the pipeline opens it", async () => {
+    const ws = await writeWorkspaceWithChange();
+    const gate = await mkdtemp(join(tmpdir(), "m87-fix-gate-"));
+    await execFileAsync("git", ["init", "-q", "--bare"], { cwd: gate });
+    await execFileAsync("git", ["remote", "add", "no-mistakes", gate], {
+      cwd: ws,
+    });
+    const { fakeBinPath } = await writeFakeNoMistakes([
+      'if (args[0] === "--version") { process.stdout.write("9.9.9"); process.exit(0); }',
+    ]);
+    const { fakeGhPath } = await writeFakeGh([
+      'if (args[0] === "auth" && args[1] === "status") { process.exit(0); }',
+      'if (args[0] === "pr" && args[1] === "list") { process.stdout.write("[]"); process.exit(0); }',
+    ]);
+    const { stdout } = await runPluginWithInput(
+      ["submit-automation-workspace"],
+      `${JSON.stringify({
+        job: {
+          id: "job-1",
+          item_external_id: "github:issue:kunchenguid/m87/7",
+          item_title: "Crash on empty config",
+          role: "maintainer",
+        },
+        workspace_path: ws,
+        config: { fix_pr_create: "no-mistakes" },
+      })}\n`,
+      {
+        ...process.env,
+        M87_GH_BIN: fakeGhPath,
+        M87_NO_MISTAKES_BIN: fakeBinPath,
+      },
+    );
+    const result = JSON.parse(stdout);
+    expect(result.status).toBe("waiting_for_pr");
+    expect(result.branch).toBe("m87/fix-job-1");
+    expect(result.repository).toBe("kunchenguid/m87");
   });
 
   // FU-15: when PR detection misses, the job waits and can be re-attached.

@@ -48,8 +48,10 @@ The current core queues fix jobs from recommendation options that include `autom
 
 ### `prepare-automation-workspace`
 
-Input: `{ config, job: { id, kind, item_external_id } }`.
+Input: `{ config, job: { id, kind, item_external_id, item_title, option_title, prompt, role } }`.
 Output: `{ status, workspace_path, base_ref, branch, warnings }`.
+
+The `item_title`, `option_title`, and `prompt` fields carry human context from the approved recommendation so the plugin can write human-facing commit messages and PR titles/bodies instead of leaking internal job ids.
 
 The plugin clones or worktrees the repo into a path it controls (mirroring ezoss's persistent investigations checkout plus an ephemeral per-job worktree), creates the fix branch, and returns the absolute `workspace_path` for the core to run the agent in.
 `status` is `prepared` or `failed`.
@@ -62,6 +64,18 @@ Output: `{ status, pr_url, commit, warnings, error }`.
 The plugin stages and commits any agent changes, pushes the branch, and opens a draft PR, returning the PR URL.
 It must be idempotent on `idempotency_key` (re-running a submit for the same job must not open a second PR) and must verify the branch actually has commits ahead of `base_ref` before pushing.
 `status` is `submitted`, `no_changes`, `waiting_for_pr`, or `failed`.
+
+#### Submission modes (GitHub plugin)
+
+How a maintainer fix leaves the workspace is plugin policy, configured per scope, because push/PR mechanics are source-specific and the core must stay source-agnostic.
+The GitHub plugin supports `fix_pr_create`: `auto` (default), `no-mistakes`, `gh`, or `disabled`, mirroring ezoss's `fixes.pr_create`.
+`auto` prefers no-mistakes when the binary is on PATH and falls back to `gh` otherwise (or when the no-mistakes push fails).
+
+no-mistakes is a local git proxy, not a `gh` replacement: the plugin ensures the gate remote exists (`git remote get-url no-mistakes`, running `no-mistakes init` when missing) and then runs `git push no-mistakes HEAD:<branch>`.
+The pipeline validates the change and opens the PR asynchronously, so the submit returns `waiting_for_pr` when the PR is not yet detectable and `m87 job attach` re-detects it later.
+Contributor pushes have the analogous `fix_contrib_push` modes: `auto`, `no-mistakes` (default: leave the commit for manual review), or `disabled`.
+
+The commit subject doubles as the PR title on paths that derive the PR from the commit (no-mistakes), so the plugin writes a human-facing commit message from the job's `item_title`/`option_title`/`prompt` context rather than internal job ids.
 
 ### `detect-automation-pr`
 

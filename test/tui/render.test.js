@@ -8,7 +8,9 @@ import { createDatabase } from "../../src/core/database.js";
 import { makeEvent } from "../../src/core/event.js";
 import { project, itemId } from "../../src/core/projections.js";
 import {
+  automationLabel,
   renderInboxView,
+  willDoLines,
   willDoWindow,
   wrapText,
 } from "../../src/tui/render.js";
@@ -79,7 +81,7 @@ describe("tui/render", () => {
             {
               title: "Reply",
               actions: [{ id: "a1", action_type: "comment" }],
-              automation: { prompt: "x" },
+              automation: { kind: "code fix", prompt: "x" },
             },
           ],
         },
@@ -90,7 +92,8 @@ describe("tui/render", () => {
     expect(view).toContain("> [0] mock:issue-1  Crash on empty config");
     expect(view).toContain("Detail: Reply and fix");
     expect(view).toContain("Reply");
-    expect(view).toContain("automation");
+    // the automation kind is shown as the option tag
+    expect(view).toContain("code fix");
     expect(view).toContain("rec: rec-1");
   });
 
@@ -160,6 +163,23 @@ describe("tui/wrapText", () => {
 
   it("returns no lines for empty text", () => {
     expect(wrapText("   ", 10)).toEqual([]);
+  });
+});
+
+describe("tui/automationLabel", () => {
+  it("uses the agent-chosen kind as the user-visible label", () => {
+    expect(automationLabel({ kind: "code fix", prompt: "p" })).toBe("code fix");
+    const lines = willDoLines(
+      { actions: [], automation: { kind: "recheck", prompt: "re-triage" } },
+      40,
+    );
+    expect(lines[0]).toEqual({ kind: "automation", text: "recheck" });
+    expect(lines[1]).toEqual({ kind: "body", text: "re-triage" });
+  });
+
+  it("falls back to the generic word for rows that predate required kind", () => {
+    expect(automationLabel({ prompt: "p" })).toBe("automation");
+    expect(automationLabel({ kind: "  ", prompt: "p" })).toBe("automation");
   });
 });
 

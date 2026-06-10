@@ -31,4 +31,20 @@ describe("agent/prompts user policy (FU-17)", () => {
     });
     expect(prompt).toContain("Prefer closing duplicates.");
   });
+
+  it("requires both automation fields and frames kind as a short label", () => {
+    const prompt = buildTriagePrompt({ item_id: "x" });
+    expect(prompt).toContain("you must fill in both fields");
+    expect(prompt).toContain("one to three words");
+    expect(prompt).toContain("short user-visible label");
+    expect(prompt).toContain(
+      "Automation blocks missing either field are discarded",
+    );
+  });
+
+  it("warns that actions post before the automation runs", () => {
+    const prompt = buildTriagePrompt({ item_id: "x" });
+    expect(prompt).toContain("execute immediately");
+    expect(prompt).toContain("never as completed work");
+  });
 });
