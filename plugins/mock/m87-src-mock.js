@@ -34,13 +34,17 @@ function readStdin() {
       if (typeof process.stdin.unref === "function") process.stdin.unref();
       resolve(data);
     };
+    const finishSoon = () => {
+      // On Windows, `close` can arrive before buffered `data` callbacks drain.
+      setTimeout(finish, 10);
+    };
     const timeoutMs = Number(process.env.M87_MOCK_STDIN_TIMEOUT_MS) || 10000;
     const timer = setTimeout(finish, timeoutMs);
     if (typeof timer.unref === "function") timer.unref();
     process.stdin.on("data", (c) => (data += c));
     process.stdin.on("end", finish);
-    process.stdin.on("close", finish);
-    process.stdin.on("error", finish);
+    process.stdin.on("close", finishSoon);
+    process.stdin.on("error", finishSoon);
     if (process.stdin.isTTY) finish();
   });
 }
