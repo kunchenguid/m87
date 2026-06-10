@@ -1,17 +1,14 @@
 #!/usr/bin/env node
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import {
-  closeSync,
   constants,
   existsSync,
-  mkdirSync,
-  openSync,
   readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, readFile, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +45,12 @@ import {
   pluginPreviewAction,
   readManifest,
 } from "../host/plugin.js";
+import {
+  gracefulStopDaemon,
+  installManagedService,
+  runningDaemonPid,
+  startDetachedDaemon,
+} from "./daemon-lifecycle.js";
 import { getStatePaths, loadConfig, saveConfig } from "./state.js";
 import { openRuntime, runOnce } from "./runtime.js";
 import { getServicePlan, isServiceDryRun } from "./service.js";
@@ -97,22 +100,9 @@ const failUsage = (msg) => fail(msg, 2);
 
 // The daemon is the sole loop/consumer. The CLI only ever appends events
 // (writes) and reads projections - it never drains the queue itself.
-function daemonPid() {
-  const { pidPath } = getStatePaths();
-  if (!existsSync(pidPath)) return null;
-  const pid = Number(readFileSync(pidPath, "utf8"));
-  if (!Number.isInteger(pid) || pid <= 0) return null;
-  try {
-    process.kill(pid, 0);
-    return pid;
-  } catch {
-    return null;
-  }
-}
-
 // Guard for mutating commands: a live daemon must be processing the queue.
 function requireDaemon() {
-  const pid = daemonPid();
+  const pid = runningDaemonPid();
   if (!pid) {
     fail("daemon not running; start it with `m87 daemon start`");
     return null;
@@ -192,7 +182,11 @@ program.action(async () => {
     // The TUI is a reader: it tails the log and enqueues decision events for
     // the daemon. It never drives the loop. `daemonPid` lets it act only when
     // the daemon is running.
-    await launchInteractiveTui({ db, agentTarget, daemonPid });
+    await launchInteractiveTui({
+      db,
+      agentTarget,
+      daemonPid: runningDaemonPid,
+    });
     db.close();
     return;
   }
@@ -250,6 +244,8 @@ function initSetupContext() {
     detectedAgents,
     detectedAgent: detectedAgents[0] ?? null,
     serviceManager: servicePlan?.manager ?? null,
+    serviceInstalled: Boolean(servicePlan && existsSync(servicePlan.unitPath)),
+    daemonPid: runningDaemonPid(),
   };
 }
 
@@ -323,29 +319,6 @@ async function applyInitSelections(selections, context, mode) {
   });
   result.mode = mode;
   out(result);
-}
-
-// Graceful, cross-platform daemon stop, shared with `m87 daemon stop`.
-async function gracefulStopDaemon() {
-  const { pidPath, controlAddress } = getStatePaths();
-  if (!existsSync(pidPath)) return { status: "not_running" };
-  const pid = Number(readFileSync(pidPath, "utf8"));
-  try {
-    await sendControl(controlAddress, { cmd: "stop" }, { timeoutMs: 3000 });
-  } catch {
-    // Control channel unreachable (stale pidfile, or a pre-socket daemon):
-    // fall back to a signal. This is forcible on Windows.
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      return { status: "not_running" };
-    }
-  }
-  const gone = await pollFor(() => (isAlive(pid) ? null : true), {
-    timeoutMs: 8000,
-    intervalMs: 100,
-  });
-  return { status: gone ? "stopped" : "stopping", pid };
 }
 
 program
@@ -1538,15 +1511,7 @@ daemon
   .command("start")
   .description("Start the daemon in the background")
   .action(() => {
-    const { pidPath, logPath } = getStatePaths();
-    if (existsSync(pidPath) && isAlive(Number(readFileSync(pidPath, "utf8")))) {
-      return out({
-        status: "already_running",
-        pid: Number(readFileSync(pidPath, "utf8")),
-      });
-    }
-    const child = spawnDetachedDaemon(logPath);
-    out({ status: "started", pid: child.pid, log: logPath });
+    out(startDetachedDaemon(CLI_ENTRY));
   });
 
 daemon
@@ -1555,41 +1520,6 @@ daemon
   .action(async () => {
     out(await gracefulStopDaemon());
   });
-
-function isAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function runningDaemonPid() {
-  const { pidPath } = getStatePaths();
-  if (!existsSync(pidPath)) {
-    return null;
-  }
-  const pid = Number(readFileSync(pidPath, "utf8"));
-  return Number.isInteger(pid) && isAlive(pid) ? pid : null;
-}
-
-function spawnDetachedDaemon(logPath) {
-  mkdirSync(dirname(logPath), { recursive: true });
-  const logFd = openSync(logPath, "a");
-  let child;
-  try {
-    child = spawn(
-      process.execPath,
-      [fileURLToPath(import.meta.url), "daemon", "run"],
-      { detached: true, stdio: ["ignore", logFd, logFd], env: process.env },
-    );
-  } finally {
-    closeSync(logFd);
-  }
-  child.unref();
-  return child;
-}
 
 daemon
   .command("status")
@@ -1606,28 +1536,19 @@ daemon
   .command("restart")
   .description("Restart the background daemon")
   .action(async () => {
-    const { logPath, controlAddress } = getStatePaths();
-    const pid = runningDaemonPid();
-    if (pid !== null) {
-      try {
-        await sendControl(controlAddress, { cmd: "stop" }, { timeoutMs: 3000 });
-      } catch {
-        try {
-          process.kill(pid, "SIGTERM");
-        } catch {
-          // already gone
-        }
-      }
-      for (let i = 0; i < 80 && isAlive(pid); i += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
+    const stopped = await gracefulStopDaemon();
+    const started = startDetachedDaemon(CLI_ENTRY);
+    if (started.status !== "started") {
+      // The old daemon survived the stop window; report it rather than
+      // stacking a second instance on top of it.
+      process.exitCode = 1;
+      return out({ status: "stop_failed", pid: started.pid });
     }
-    const child = spawnDetachedDaemon(logPath);
     out({
       status: "restarted",
-      pid: child.pid,
-      log: logPath,
-      stopped: pid,
+      pid: started.pid,
+      log: started.log,
+      stopped: stopped.pid ?? null,
     });
   });
 
@@ -1635,33 +1556,9 @@ daemon
   .command("install")
   .description("Install the daemon as a managed OS service (start at login)")
   .action(async () => {
-    const { stateDir } = getStatePaths();
-    const plan = getServicePlan(stateDir, CLI_ENTRY);
-    if (!plan) {
-      process.exitCode = 1;
-      return out({ status: "unsupported", platform: process.platform });
-    }
-    await mkdir(dirname(plan.unitPath), { recursive: true });
-    await writeFile(plan.unitPath, plan.content);
-    let activation = "skipped_dry_run";
-    if (!isServiceDryRun()) {
-      try {
-        execFileSync(plan.activate.command, plan.activate.args, {
-          stdio: "ignore",
-          timeout: 10000,
-        });
-        activation = "activated";
-      } catch {
-        activation = "write_only_activation_failed";
-      }
-    }
-    out({
-      status: "installed",
-      manager: plan.manager,
-      label: plan.label,
-      unit: plan.unitPath,
-      activation,
-    });
+    const result = await installManagedService(CLI_ENTRY);
+    if (result.status === "unsupported") process.exitCode = 1;
+    out(result);
   });
 
 daemon

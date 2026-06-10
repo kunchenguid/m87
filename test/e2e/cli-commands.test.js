@@ -195,6 +195,14 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
     expect(installed.status).toBe("installed");
     expect(["launchd", "systemd", "schtasks"]).toContain(installed.manager);
     expect(installed.activation).toBe("skipped_dry_run");
+    // The suite's session daemon is handed over to the service instead of
+    // being left to fight the service-spawned instance over the control
+    // socket and pid file.
+    expect(installed.stopped).toMatchObject({
+      status: "stopped",
+      pid: daemon.pid,
+    });
+    expect(parse(await m87("daemon", "status")).running).toBe(false);
     const uninstalled = parse(await m87("daemon", "uninstall"));
     expect(uninstalled.status).toBe("uninstalled");
   });

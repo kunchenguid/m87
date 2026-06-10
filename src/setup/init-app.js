@@ -39,12 +39,28 @@ function applyChoice(state, choiceId) {
   }
   if (state.currentStep === "review") {
     if (choiceId === "service") {
-      return { ...state, installService: true, startDaemon: true };
+      return {
+        ...state,
+        installService: true,
+        startDaemon: true,
+        stopDaemon: false,
+      };
     }
     if (choiceId === "session") {
-      return { ...state, installService: false, startDaemon: true };
+      return {
+        ...state,
+        installService: false,
+        startDaemon: true,
+        stopDaemon: false,
+      };
     }
-    return { ...state, installService: false, startDaemon: false };
+    // "stop" replaces "none" when a daemon is already running.
+    return {
+      ...state,
+      installService: false,
+      startDaemon: false,
+      stopDaemon: choiceId === "stop",
+    };
   }
   return state;
 }

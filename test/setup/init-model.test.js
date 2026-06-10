@@ -21,6 +21,8 @@ const context = {
   serviceManager: "launchd",
 };
 
+const runningContext = { ...context, daemonPid: 4242, serviceInstalled: false };
+
 describe("setup/init model", () => {
   it("opens on the agent step with no informational core step", () => {
     expect(defaultInitSelections().currentStep).toBe("agent");
@@ -56,6 +58,79 @@ describe("setup/init model", () => {
         (c) => c.id === "none",
       ).selected,
     ).toBe(true);
+  });
+
+  it("acknowledges an already-running M87 on the review step", () => {
+    const model = buildInitWizardModel(
+      { ...defaultInitSelections(), currentStep: "review" },
+      runningContext,
+    );
+    // The status note replaces the misleading "Start now" framing.
+    expect(model.screen.body.join("\n")).toContain("already running");
+    expect(model.screen.choices.map((choice) => choice.id)).toEqual([
+      "service",
+      "session",
+      "stop",
+    ]);
+    const [service, session, stop] = model.screen.choices;
+    expect(service.label).toBe("Keep running & launch at login");
+    expect(service.selected).toBe(true);
+    expect(session.label).toBe("Keep running (this session only)");
+    expect(stop.label).toBe("Stop running");
+  });
+
+  it("notes the current setup when the login service is already installed", () => {
+    const model = buildInitWizardModel(
+      { ...defaultInitSelections(), currentStep: "review" },
+      { ...runningContext, serviceInstalled: true },
+    );
+    expect(model.screen.choices[0].detail).toContain("current setup");
+  });
+
+  it("plans keep-running instead of start when M87 is already running", () => {
+    const service = buildInitApplyPlan(defaultInitSelections(), runningContext);
+    expect(service.sideEffects.find((e) => e.id === "service").label).toContain(
+      "Keep M87 running",
+    );
+
+    const session = buildInitApplyPlan(
+      { ...defaultInitSelections(), installService: false },
+      runningContext,
+    );
+    expect(
+      session.sideEffects.find((e) => e.id === "daemon-start").label,
+    ).toContain("Keep M87 running");
+    // Starting again would be a no-op, so the plan does not pretend to do it.
+    expect(session.commands).not.toContain("m87 daemon start");
+  });
+
+  it("plans a stop when the user chooses to stop the running M87", () => {
+    const selections = {
+      ...defaultInitSelections(),
+      installService: false,
+      startDaemon: false,
+      stopDaemon: true,
+    };
+    const plan = buildInitApplyPlan(selections, runningContext);
+    expect(plan.daemon).toEqual({
+      installService: false,
+      startDaemon: false,
+      stopDaemon: true,
+    });
+    expect(plan.sideEffects.map((e) => e.id)).toContain("daemon-stop");
+    expect(plan.commands).toContain("m87 daemon stop");
+  });
+
+  it("ignores a stale stop choice when nothing is running", () => {
+    const selections = {
+      ...defaultInitSelections(),
+      installService: false,
+      startDaemon: false,
+      stopDaemon: true,
+    };
+    const plan = buildInitApplyPlan(selections, context);
+    expect(plan.daemon.stopDaemon).toBe(false);
+    expect(plan.sideEffects.map((e) => e.id)).not.toContain("daemon-stop");
   });
 
   it("keeps the review step free of daemon/launchd jargon", () => {
@@ -290,24 +365,27 @@ describe("setup/init model", () => {
       "login service",
       "registry",
     ];
+    const contexts = [context, { ...runningContext, serviceInstalled: true }];
     for (const selections of screens) {
-      const { screen, steps } = buildInitWizardModel(selections, context);
-      const text = [
-        ...steps.map((step) => step.label),
-        screen.heading,
-        ...screen.body,
-        ...screen.choices.flatMap((choice) => [choice.label, choice.detail]),
-        screen.input?.label,
-        screen.input?.placeholder,
-      ]
-        .filter(Boolean)
-        .join("\n")
-        .toLowerCase();
-      for (const term of jargon) {
-        expect(
-          text,
-          `step ${selections.currentStep} leaks "${term}"`,
-        ).not.toContain(term);
+      for (const ctx of contexts) {
+        const { screen, steps } = buildInitWizardModel(selections, ctx);
+        const text = [
+          ...steps.map((step) => step.label),
+          screen.heading,
+          ...screen.body,
+          ...screen.choices.flatMap((choice) => [choice.label, choice.detail]),
+          screen.input?.label,
+          screen.input?.placeholder,
+        ]
+          .filter(Boolean)
+          .join("\n")
+          .toLowerCase();
+        for (const term of jargon) {
+          expect(
+            text,
+            `step ${selections.currentStep} leaks "${term}"`,
+          ).not.toContain(term);
+        }
       }
     }
   });

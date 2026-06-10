@@ -146,6 +146,9 @@ describe("e2e: init wizard command contract", () => {
       await m87("init", "--yes", "--no-install-service", "--start-daemon"),
     );
     expect(result.daemon).toMatchObject({ status: "started" });
+    // The setup-started daemon gets the same log redirection as
+    // `m87 daemon start` - its stderr is the operational record.
+    expect(result.daemon.log).toBe(join(stateDir, "daemon.log"));
 
     // The detached daemon needs a moment to boot and advertise its pidfile;
     // once up, it keeps running after the init command returns.

@@ -1,12 +1,13 @@
-import { execFileSync, spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { existsSync } from "node:fs";
 
 import { createDatabase } from "../core/database.js";
 import { seedRetentionPolicy } from "../core/retention.js";
 import { pluginConfigure, readManifest } from "../host/plugin.js";
-import { getServicePlan, isServiceDryRun } from "../cli/service.js";
+import {
+  gracefulStopDaemon,
+  installManagedService,
+  startDetachedDaemon,
+} from "../cli/daemon-lifecycle.js";
 import {
   ensureStateDir,
   getStatePaths,
@@ -64,61 +65,6 @@ export async function installBundledPlugin({
   return { manifest, configure };
 }
 
-export async function installManagedService(cliEntry) {
-  const { stateDir } = getStatePaths();
-  const plan = getServicePlan(stateDir, cliEntry);
-  if (!plan) {
-    return { status: "unsupported", platform: process.platform };
-  }
-  await mkdir(dirname(plan.unitPath), { recursive: true });
-  await writeFile(plan.unitPath, plan.content);
-  let activation = "skipped_dry_run";
-  if (!isServiceDryRun()) {
-    try {
-      execFileSync(plan.activate.command, plan.activate.args, {
-        stdio: "ignore",
-        timeout: 10000,
-      });
-      activation = "activated";
-    } catch {
-      activation = "write_only_activation_failed";
-    }
-  }
-  return {
-    status: "installed",
-    manager: plan.manager,
-    label: plan.label,
-    unit: plan.unitPath,
-    activation,
-  };
-}
-
-export function startDetachedDaemon(cliEntry) {
-  const { logPath, pidPath } = getStatePaths();
-  if (existsSync(pidPath)) {
-    const pid = Number(readFileSync(pidPath, "utf8"));
-    if (Number.isInteger(pid) && isAlive(pid)) {
-      return { status: "already_running", pid };
-    }
-  }
-  const child = spawn(process.execPath, [cliEntry, "daemon", "run"], {
-    detached: true,
-    stdio: ["ignore", "ignore", "ignore"],
-    env: process.env,
-  });
-  child.unref();
-  return { status: "started", pid: child.pid, log: logPath };
-}
-
-function isAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
   const initialized = initializeCoreState({ agent: plan.agent.configValue });
   const result = {
@@ -149,9 +95,13 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
   }
 
   if (plan.daemon.installService) {
-    result.service = await installManagedService(cliEntry);
+    const { stopped, ...service } = await installManagedService(cliEntry);
+    result.service = service;
+    if (stopped) result.daemon = stopped;
   } else if (plan.daemon.startDaemon) {
     result.daemon = startDetachedDaemon(cliEntry);
+  } else if (plan.daemon.stopDaemon) {
+    result.daemon = await gracefulStopDaemon();
   }
 
   return result;
