@@ -255,6 +255,11 @@ function handle(command, input) {
 
 async function main() {
   const command = process.argv[2];
+  if (command === "manifest") {
+    process.stdout.write(`${JSON.stringify(handle(command, {}))}\n`);
+    return;
+  }
+
   const raw = await readStdin();
   let input = {};
   try {
