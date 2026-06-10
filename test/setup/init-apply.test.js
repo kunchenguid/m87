@@ -133,6 +133,7 @@ describe("init apply daemon lifecycle", () => {
         unitExistedBeforeInstall: false,
         restored: { status: "started", pid: 12345 },
       });
+      expect(existsSync(servicePlan.unitPath)).toBe(false);
       expect(spawn).toHaveBeenCalledWith(
         process.execPath,
         [cliEntry, "daemon", "run"],
@@ -140,6 +141,64 @@ describe("init apply daemon lifecycle", () => {
       );
     } finally {
       if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
+    }
+  });
+
+  it("rolls back a failed first-time service install so retry restores the session daemon", async () => {
+    const servicePlan = getServicePlan(stateDir, cliEntry);
+    process.env.M87_SERVICE_DRY_RUN = "0";
+    execFileSync.mockImplementation(() => {
+      throw new Error("activate failed");
+    });
+
+    const firstChild = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(firstChild.pid));
+
+    try {
+      const firstResult = await installManagedService(cliEntry);
+
+      expect(firstResult).toMatchObject({
+        status: "activation_failed",
+        stopped: { status: "stopped", pid: firstChild.pid },
+        unitExistedBeforeInstall: false,
+        restored: { status: "started", pid: 12345 },
+      });
+      expect(existsSync(servicePlan.unitPath)).toBe(false);
+    } finally {
+      if (firstChild.exitCode === null && !firstChild.killed) {
+        firstChild.kill("SIGKILL");
+      }
+    }
+
+    spawn.mockClear();
+    const retryChild = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(retryChild.pid));
+
+    try {
+      const retryResult = await installManagedService(cliEntry);
+
+      expect(retryResult).toMatchObject({
+        status: "activation_failed",
+        stopped: { status: "stopped", pid: retryChild.pid },
+        unitExistedBeforeInstall: false,
+        restored: { status: "started", pid: 12345 },
+      });
+      expect(existsSync(servicePlan.unitPath)).toBe(false);
+      expect(spawn).toHaveBeenCalledWith(
+        process.execPath,
+        [cliEntry, "daemon", "run"],
+        expect.objectContaining({ detached: true }),
+      );
+    } finally {
+      if (retryChild.exitCode === null && !retryChild.killed) {
+        retryChild.kill("SIGKILL");
+      }
     }
   });
 
@@ -170,6 +229,7 @@ describe("init apply daemon lifecycle", () => {
         unitExistedBeforeInstall: true,
       });
       expect(result.restored).toBeUndefined();
+      expect(existsSync(servicePlan.unitPath)).toBe(true);
       expect(spawn).not.toHaveBeenCalled();
     } finally {
       if (child.exitCode === null && !child.killed) child.kill("SIGKILL");
@@ -445,6 +505,7 @@ describe("init apply daemon lifecycle", () => {
       unit: servicePlan.unitPath,
       deactivation: "deactivate_failed",
     });
+    expect(existsSync(servicePlan.unitPath)).toBe(true);
     expect(result.daemon).toEqual({ status: "not_started" });
     expect(spawn).not.toHaveBeenCalled();
   });
@@ -477,6 +538,7 @@ describe("init apply daemon lifecycle", () => {
 
       expect(result.status).toBe("deactivate_failed");
       expect(result.service_uninstall.deactivation).toBe("deactivate_failed");
+      expect(existsSync(servicePlan.unitPath)).toBe(true);
       expect(result.daemon).toEqual({ status: "not_started" });
       expect(process.kill(child.pid, 0)).toBe(true);
     } finally {

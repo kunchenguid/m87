@@ -124,6 +124,7 @@ export async function installManagedService(cliEntry) {
     stopped?.status === "stopped" &&
     !unitExistedBeforeInstall
   ) {
+    await rm(plan.unitPath, { force: true });
     const restored = startDetachedDaemon(cliEntry);
     return {
       status: "activation_failed",
@@ -181,6 +182,15 @@ export async function uninstallManagedService(cliEntry) {
     } catch {
       deactivation = "deactivate_failed";
     }
+  }
+  if (deactivation === "deactivate_failed") {
+    return {
+      status: "uninstalled",
+      manager: plan.manager,
+      label: plan.label,
+      unit: plan.unitPath,
+      deactivation,
+    };
   }
   await rm(plan.unitPath, { force: true });
   return {
