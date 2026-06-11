@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.6](https://github.com/kunchenguid/m87/compare/m87-v0.1.5...m87-v0.1.6) (2026-06-11)
+
+
+### Bug Fixes
+
+* **cli:** make init and service install daemon-aware ([#20](https://github.com/kunchenguid/m87/issues/20)) ([1955487](https://github.com/kunchenguid/m87/commit/1955487bcebaeafc2e1af90d77d3142296530dc8))
+* deduplicate inbox recommendations and stabilize selection ([#23](https://github.com/kunchenguid/m87/issues/23)) ([d2f426e](https://github.com/kunchenguid/m87/commit/d2f426e2027e0a19529f11394fa32810d93c4761))
+* enforce automation contract and improve fix PR copy ([#22](https://github.com/kunchenguid/m87/issues/22)) ([f15cbd3](https://github.com/kunchenguid/m87/commit/f15cbd3fc5db9a50c69a5730e346804da1408fbb))
+
 ## [0.1.5](https://github.com/kunchenguid/m87/compare/m87-v0.1.4...m87-v0.1.5) (2026-06-09)
 
 
