@@ -104,6 +104,22 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
     expect(v.recommendation.summary).toBe("Reply and fix");
   });
 
+  it("list shows one row for historical duplicate live recommendations", async () => {
+    const db = new Database(join(stateDir, "m87.sqlite"));
+    db.prepare(
+      `insert into recommendations
+        (id, item_id, agent_run_id, source_event_id, summary, evidence_json,
+         activity_at, content_fingerprint, created_at, superseded_at)
+       values ('rec-duplicate', 'mock:issue-1', null, 'ev-duplicate', 'newer', '[]',
+               '2099-01-01T00:00:00Z', '', '2099-01-01T00:00:00Z', null)`,
+    ).run();
+    db.close();
+
+    const listed = parse(await m87("list"));
+    expect(listed.inbox).toHaveLength(1);
+    expect(listed.inbox[0].recommendation_id).toBe("rec-duplicate");
+  });
+
   it("open prints the source url; copy-handoff prints a prompt", async () => {
     expect(parse(await m87("open", "mock:issue-1")).url).toBe("mock://issue/1");
     expect(

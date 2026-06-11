@@ -576,6 +576,9 @@ function listInbox(db) {
               i.local_state, i.attention_priority_hint
          from recommendations r join items i on i.id = r.item_id
         where r.superseded_at is null
+          and r.id = (select r2.id from recommendations r2
+                       where r2.item_id = r.item_id and r2.superseded_at is null
+                       order by r2.created_at desc, r2.rowid desc limit 1)
           and (i.local_state in ('recommended','action_error')
                or (i.local_state='snoozed' and i.snoozed_until <= ?))
         order by case i.attention_priority_hint when 'urgent' then 0 else 1 end, i.activity_at desc`,
