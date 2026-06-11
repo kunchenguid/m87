@@ -19,6 +19,8 @@ import {
 } from "./service.js";
 import { getStatePaths } from "./state.js";
 
+/** @typedef {"match" | "mismatch" | "unknown"} DaemonPidIdentity */
+
 // Daemon process lifecycle shared by the CLI commands and the setup flow, so
 // both sides agree on what "running" means (a live process behind the pid
 // file in the state dir) and on how a daemon is started, stopped, and handed
@@ -51,7 +53,8 @@ function forgetDaemonPid() {
 // fallback in gracefulStopDaemon must never fire on such a pid - on Windows
 // the emulated SIGTERM is an unconditional TerminateProcess - so the live
 // process's command line has to look like `... daemon run` first.
-function pidLooksLikeDaemon(pid) {
+/** @returns {DaemonPidIdentity} */
+function daemonPidIdentity(pid) {
   try {
     const { stateDir } = getStatePaths();
     const token = getServiceLabel(stateDir);
@@ -71,24 +74,34 @@ function pidLooksLikeDaemon(pid) {
             timeout: 10000,
           });
     const commandText = String(command ?? "");
-    return (
-      /\bdaemon\s+run\b/.test(commandText) &&
+    return /\bdaemon\s+run\b/.test(commandText) &&
       commandText.includes("--state-token") &&
       commandText.includes(token)
-    );
+      ? "match"
+      : "mismatch";
   } catch {
-    return false;
+    return "unknown";
   }
+}
+
+/** @param {DaemonPidIdentity | boolean} identity */
+function isDaemonPidMatch(identity) {
+  return identity === true || identity === "match";
+}
+
+/** @param {DaemonPidIdentity | boolean} identity */
+function isDaemonPidMismatch(identity) {
+  return identity === false || identity === "mismatch";
 }
 
 // Graceful, cross-platform daemon stop: ask over the control channel first,
 // fall back to a signal (forcible on Windows), then wait briefly for exit.
 // `confirmDaemonPid` exists for tests that stand in fake daemons.
 /**
- * @param {{ confirmDaemonPid?: (pid: number) => boolean | Promise<boolean> }} [options]
+ * @param {{ confirmDaemonPid?: (pid: number) => DaemonPidIdentity | boolean | Promise<DaemonPidIdentity | boolean> }} [options]
  */
 export async function gracefulStopDaemon({
-  confirmDaemonPid = pidLooksLikeDaemon,
+  confirmDaemonPid = daemonPidIdentity,
 } = {}) {
   const { controlAddress } = getStatePaths();
   const pid = runningDaemonPid();
@@ -99,8 +112,9 @@ export async function gracefulStopDaemon({
     // Control channel unreachable (e.g. a pre-socket daemon): fall back to a
     // signal, but only onto a verified daemon process - never a pid the OS
     // recycled into something else.
-    if (!(await confirmDaemonPid(pid))) {
-      forgetDaemonPid();
+    const identity = await confirmDaemonPid(pid);
+    if (!isDaemonPidMatch(identity)) {
+      if (isDaemonPidMismatch(identity)) forgetDaemonPid();
       return { status: "not_running" };
     }
     try {
@@ -123,7 +137,10 @@ export function startDetachedDaemon(cliEntry) {
   const { logPath, stateDir } = getStatePaths();
   const pid = runningDaemonPid();
   if (pid !== null) {
-    if (pidLooksLikeDaemon(pid)) return { status: "already_running", pid };
+    const identity = daemonPidIdentity(pid);
+    if (!isDaemonPidMismatch(identity)) {
+      return { status: "already_running", pid };
+    }
     forgetDaemonPid();
   }
   mkdirSync(dirname(logPath), { recursive: true });

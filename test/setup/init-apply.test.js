@@ -108,6 +108,20 @@ describe("init apply daemon lifecycle", () => {
     );
   });
 
+  it("does not start another daemon when pid identity is unknown", () => {
+    const pidPath = join(stateDir, "daemon.pid");
+    writeFileSync(pidPath, String(process.pid));
+    execFileSync.mockImplementation(() => {
+      throw new Error("probe failed");
+    });
+
+    const result = startDetachedDaemon(cliEntry);
+
+    expect(result).toEqual({ status: "already_running", pid: process.pid });
+    expect(existsSync(pidPath)).toBe(true);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it("stops a session daemon before handing over to the managed service", async () => {
     // A real disposable process stands in for a previously started session
     // daemon (spawn is mocked, execFile is not).

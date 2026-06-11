@@ -77,6 +77,19 @@ describe("cli/daemon-lifecycle signal fallback identity check", () => {
     expect(existsSync(join(stateDir, "daemon.pid"))).toBe(false);
   });
 
+  it("leaves the pidfile when daemon identity is unknown", async () => {
+    child = execFile(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+
+    const result = await gracefulStopDaemon({
+      confirmDaemonPid: () => "unknown",
+    });
+
+    expect(result).toEqual({ status: "not_running" });
+    expect(isAlive(child.pid)).toBe(true);
+    expect(existsSync(join(stateDir, "daemon.pid"))).toBe(true);
+  });
+
   it("stops a verified daemon process via the signal fallback", async () => {
     child = execFile(process.execPath, [
       "-e",
