@@ -118,6 +118,7 @@ The core saves returned fingerprints only after events and warnings are durably 
 
 Events should use stable `external_id` values that can be inserted idempotently.
 Item events should include source-owned activity watermarks and payloads with enough detail for core projections.
+When a changed watermark causes retriage, M87 keeps only the newest live recommendation for that item in the review inbox.
 Item event `metadata` may include a short `display_handle` for inbox rows, such as `owner/repo · PR #123` or `sender · subject`.
 If omitted, the TUI falls back to the humanized `item_type`.
 Deletion or unavailable-item changes should be represented as events with the same external ids as prior items.

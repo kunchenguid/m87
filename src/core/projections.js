@@ -28,7 +28,7 @@ const reducers = {
 
   // recommendation.created payload: { recommendation_id, summary, evidence,
   //   options:[{title,rationale,evidence_refs,confidence,waiting_on,actions,automation}],
-  //   agent_run_id?, content_fingerprint?, activity_at? }
+  //   agent_run_id?, activity_at, content_fingerprint }
   "recommendation.created": (db, e) => insertRecommendation(db, e),
   // recommendation.closed payload: { recommendation_id, type:'superseded'|'invalid' }
   "recommendation.closed": (db, e) => closeRecommendation(db, e),
