@@ -603,6 +603,7 @@ export function createEffects(ctx) {
       api.emit({
         entity: "job",
         lifecycle: "closed",
+        item_id: job.item_id,
         payload: {
           type: "pr_opened",
           job_id: job.id,
@@ -621,7 +622,9 @@ export function createEffects(ctx) {
     const waitedMs = job.started_at
       ? Date.now() - Date.parse(job.started_at)
       : 0;
-    if (waitedMs >= PR_CHECK_WARN_AFTER_MS) {
+    const prCheckWarnedAt = meta.pr_check_warned_at ?? null;
+    const shouldWarn = waitedMs >= PR_CHECK_WARN_AFTER_MS && !prCheckWarnedAt;
+    if (shouldWarn) {
       logger.warn("fix job still waiting for its PR", {
         job: job.id,
         branch: meta.branch,
@@ -639,6 +642,7 @@ export function createEffects(ctx) {
         status: "running",
         phase: "waiting_for_pr",
         check_attempts: attempts,
+        ...(shouldWarn ? { metadata: { pr_check_warned_at: nowIso() } } : {}),
         next_check_at: new Date(
           Date.now() + prCheckDelayMs(attempts, prCheckCapMs),
         ).toISOString(),

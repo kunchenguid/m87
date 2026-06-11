@@ -98,6 +98,7 @@ describe("host/effects fix_detect (FU-15)", () => {
       (e) => e.entity === "job" && e.lifecycle === "closed",
     );
     expect(closed).toBeDefined();
+    expect(closed.item_id).toBe("github:github:pr:o/r/5");
     expect(closed.payload.status).toBe("succeeded");
     expect(closed.payload.metadata.pr_url).toBe(
       "https://github.com/o/r/pull/5",
@@ -173,6 +174,13 @@ describe("host/effects fix_detect (FU-15)", () => {
       (e) => e.entity === "job" && e.lifecycle === "updated",
     );
     expect(updated.payload.phase).toBe("waiting_for_pr");
+    expect(updated.payload.metadata.pr_check_warned_at).toBeDefined();
     expect(events.some((e) => e.lifecycle === "closed")).toBe(false);
+
+    project(db, makeEvent({ actor: "core", ...updated }));
+    events.length = 0;
+    await effects.fix_detect({ job_id: "job-1" }, api);
+
+    expect(warnings).toHaveLength(1);
   });
 });
