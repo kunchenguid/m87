@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/kunchenguid/m87/compare/m87-v0.1.8...m87-v0.1.9) (2026-06-11)
+
+
+### Features
+
+* **cli:** restart daemon after package upgrades ([#28](https://github.com/kunchenguid/m87/issues/28)) ([3ea446d](https://github.com/kunchenguid/m87/commit/3ea446d6e7c645871f53059b4d24456f9d07d9a5))
+
 ## [0.1.8](https://github.com/kunchenguid/m87/compare/m87-v0.1.7...m87-v0.1.8) (2026-06-11)
 
 
