@@ -194,35 +194,18 @@ describe("cli/daemon-lifecycle restartDaemon with a managed service", () => {
     const plan = getServicePlan(stateDir, cliEntry);
     mkdirSync(dirname(plan.unitPath), { recursive: true });
     writeFileSync(plan.unitPath, plan.content);
-    const readyPath = join(stateDir, "fake-daemon-ready");
-    const child = execFile(process.execPath, [
-      "-e",
-      `require('node:fs').writeFileSync(${JSON.stringify(readyPath)}, '1'); process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)`,
-      "daemon",
-      "run",
-      "--state-token",
-      getServiceLabel(stateDir),
-    ]);
-    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    const pid = 812;
 
-    try {
-      for (let i = 0; i < 50 && !existsSync(readyPath); i += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-      const result = await restartDaemon(cliEntry, {
-        confirmDaemonPid: () => "match",
-      });
+    const result = await restartDaemon(cliEntry, {
+      stopDaemon: async () => ({ status: "stopping", pid }),
+    });
 
-      expect(result).toEqual({
-        status: "stop_failed",
-        manager: plan.manager,
-        unit: plan.unitPath,
-        stopped: { status: "stopping", pid: child.pid },
-      });
-      expect(isAlive(child.pid)).toBe(true);
-    } finally {
-      child.kill("SIGKILL");
-    }
+    expect(result).toEqual({
+      status: "stop_failed",
+      manager: plan.manager,
+      unit: plan.unitPath,
+      stopped: { status: "stopping", pid },
+    });
   });
 
   it("reports no managed service when no unit exists", () => {

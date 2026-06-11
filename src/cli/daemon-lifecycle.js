@@ -178,9 +178,12 @@ export function managedServiceExists(cliEntry) {
 // then activate so the manager spawns the fresh code.
 /**
  * @param {string} cliEntry
- * @param {{ confirmDaemonPid?: (pid: number) => DaemonPidIdentity | boolean | Promise<DaemonPidIdentity | boolean> }} [options]
+ * @param {{ confirmDaemonPid?: (pid: number) => DaemonPidIdentity | boolean | Promise<DaemonPidIdentity | boolean>, stopDaemon?: typeof gracefulStopDaemon }} [options]
  */
-export async function restartDaemon(cliEntry, { confirmDaemonPid } = {}) {
+export async function restartDaemon(
+  cliEntry,
+  { confirmDaemonPid, stopDaemon = gracefulStopDaemon } = {},
+) {
   const { stateDir } = getStatePaths();
   const plan = getServicePlan(stateDir, cliEntry);
   if (
@@ -199,7 +202,7 @@ export async function restartDaemon(cliEntry, { confirmDaemonPid } = {}) {
         // activation below is the step that has to succeed.
       }
     }
-    const stopped = await gracefulStopDaemon({ confirmDaemonPid });
+    const stopped = await stopDaemon({ confirmDaemonPid });
     if (stopped.status === "stopping") {
       return {
         status: "stop_failed",
@@ -230,7 +233,7 @@ export async function restartDaemon(cliEntry, { confirmDaemonPid } = {}) {
       stopped: stopped.pid ?? null,
     };
   }
-  const stopped = await gracefulStopDaemon({ confirmDaemonPid });
+  const stopped = await stopDaemon({ confirmDaemonPid });
   const started = startDetachedDaemon(cliEntry);
   if (started.status !== "started") {
     // The old daemon survived the stop window; report it rather than
