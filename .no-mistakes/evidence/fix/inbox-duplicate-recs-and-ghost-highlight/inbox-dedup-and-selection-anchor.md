@@ -5,18 +5,18 @@
 Seeded database state intentionally contains two live recommendations for one item:
 
 [
-  {
-    "id": "rec-old",
-    "item_id": "mock:issue-69",
-    "summary": "Older recommendation",
-    "superseded_at": null
-  },
-  {
-    "id": "rec-new",
-    "item_id": "mock:issue-69",
-    "summary": "Newer duplicate recommendation",
-    "superseded_at": null
-  }
+{
+"id": "rec-old",
+"item_id": "mock:issue-69",
+"summary": "Older recommendation",
+"superseded_at": null
+},
+{
+"id": "rec-new",
+"item_id": "mock:issue-69",
+"summary": "Newer duplicate recommendation",
+"superseded_at": null
+}
 ]
 
 Actual end-user CLI command:
@@ -30,7 +30,7 @@ inbox:
   - recommendation_id: rec-new
     summary: Newer duplicate recommendation
     item_id: mock:issue-69
-    title: 'Lavish AXI issue #69'
+    title: "Lavish AXI issue #69"
     url: mock://issue/69
     local_state: recommended
     attention_priority_hint: null
@@ -49,26 +49,26 @@ The approval event still targets the original recommendation option, not the new
 Inbox order after newer arrival:
 
 [
-  {
-    "recommendation_id": "rec-newer",
-    "title": "issue-2-newer-arrival",
-    "activity_at": "2024-01-03T00:00:00.000Z"
-  },
-  {
-    "recommendation_id": "rec-original",
-    "title": "issue-1-original-selection",
-    "activity_at": "2024-01-02T00:00:00.000Z"
-  }
+{
+"recommendation_id": "rec-newer",
+"title": "issue-2-newer-arrival",
+"activity_at": "2024-01-03T00:00:00.000Z"
+},
+{
+"recommendation_id": "rec-original",
+"title": "issue-1-original-selection",
+"activity_at": "2024-01-02T00:00:00.000Z"
+}
 ]
 
 Approval payload written by the interactive TUI:
 
 {
-  "type": "approved",
-  "approval_id": "approval-rec-original",
-  "recommendation_id": "rec-original",
-  "option_id": "rec-original-opt-0",
-  "decision": "approved"
+"type": "approved",
+"approval_id": "approval-rec-original",
+"recommendation_id": "rec-original",
+"option_id": "rec-original-opt-0",
+"decision": "approved"
 }
 
 Captured TUI terminal output with ANSI stripped for review:
