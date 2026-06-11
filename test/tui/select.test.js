@@ -211,6 +211,24 @@ describe("tui option select-then-approve", () => {
     expect(lastApprovalOptionId(db)).toBe("rec-1-opt-2");
   });
 
+  it("keeps the highlight anchored when a newer item arrives above it", async () => {
+    // ITEM is on screen and selected. A newer item then lands on top of the
+    // inbox; the selection must follow the anchored recommendation, so `a`
+    // approves ITEM's recommendation, not the newcomer's.
+    await mountAndType(db, [
+      () =>
+        seedItem(db, {
+          item: ITEM_2,
+          externalId: "issue-2",
+          recId: "rec-2",
+          activityAt: "2024-01-03T00:00:00.000Z",
+        }),
+      "r",
+      "a",
+    ]);
+    expect(lastApprovalOptionId(db)).toBe("rec-1-opt-0");
+  });
+
   it("resets the selected option when the current recommendation changes", async () => {
     seedItem(db, {
       item: ITEM_2,

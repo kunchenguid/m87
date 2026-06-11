@@ -262,6 +262,8 @@ export function createEffects(ctx) {
           type: "triage_result",
           recommendation_id: recId,
           agent_run_id: agentRunId,
+          activity_at: item.activity_at,
+          content_fingerprint: item.content_fingerprint,
           summary: rec.summary ?? "",
           evidence: rec.evidence ?? [],
           options: rec.options.map((o, i) => ({

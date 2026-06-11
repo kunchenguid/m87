@@ -17,7 +17,14 @@ const { createElement: h, useEffect, useRef, useState } = React;
 function InboxApp({ db, agentTarget, daemonPid }) {
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
-  const [selected, setSelected] = useState(0);
+  // Selection is anchored to a recommendation id, not a list position: the
+  // inbox reorders under the 500ms poll (new items insert on top), and a bare
+  // index would silently move the highlight - and the next `a` - to a
+  // different item. The last resolved index is the fallback for when the
+  // anchored recommendation leaves the inbox (approved/dismissed/superseded):
+  // the highlight stays at that position and re-anchors there.
+  const [selectedRecId, setSelectedRecId] = useState(null);
+  const lastSelectedIndexRef = useRef(0);
   // Which recommendation option is selected for the current item. 0 is the
   // agent's recommended option; number keys move it, `a` approves it. Reset to
   // the recommended option whenever the selected item changes.
@@ -42,8 +49,23 @@ function InboxApp({ db, agentTarget, daemonPid }) {
   }, [cursor, db]);
 
   const inbox = listInbox(db);
-  const current = inbox[Math.min(selected, Math.max(0, inbox.length - 1))];
+  const anchoredIndex = inbox.findIndex(
+    (r) => r.recommendation_id === selectedRecId,
+  );
+  const selected =
+    anchoredIndex >= 0
+      ? anchoredIndex
+      : Math.max(0, Math.min(lastSelectedIndexRef.current, inbox.length - 1));
+  lastSelectedIndexRef.current = selected;
+  const current = inbox[selected];
   const currentRecommendationId = current?.recommendation_id ?? null;
+  // Render-phase re-anchor (React's derived-state pattern): whenever the
+  // highlight lands on a row that isn't the anchor (first frame, or the
+  // anchored rec left the inbox), adopt that row so the selection is sticky
+  // before the user ever navigates.
+  if (currentRecommendationId !== selectedRecId) {
+    setSelectedRecId(currentRecommendationId);
+  }
   const previousRecommendationId = useRef(currentRecommendationId);
   const selectedOptionRecommendationId = useRef(currentRecommendationId);
   const effectiveSelectedOption =
@@ -93,14 +115,16 @@ function InboxApp({ db, agentTarget, daemonPid }) {
     // Arrows move between inbox items (and reset the option + detail scroll, since
     // the recommendation changes). j/k are reserved for scrolling the detail.
     if (key.downArrow) {
-      setSelected((s) => Math.min(s + 1, inbox.length - 1));
+      const next = Math.min(selected + 1, Math.max(0, inbox.length - 1));
+      setSelectedRecId(inbox[next]?.recommendation_id ?? null);
       selectedOptionRecommendationId.current = null;
       setSelectedOption(0);
       setDetailScroll(0);
       return;
     }
     if (key.upArrow) {
-      setSelected((s) => Math.max(s - 1, 0));
+      const next = Math.max(selected - 1, 0);
+      setSelectedRecId(inbox[next]?.recommendation_id ?? null);
       selectedOptionRecommendationId.current = null;
       setSelectedOption(0);
       setDetailScroll(0);

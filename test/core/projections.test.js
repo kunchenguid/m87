@@ -115,6 +115,84 @@ describe("core/projections", () => {
     ).toBe("recommended");
   });
 
+  it("a newer recommendation supersedes the previous live one for the same item", () => {
+    project(db, itemCreated());
+    const rec = (id) =>
+      makeEvent({
+        actor: "agent",
+        entity: "recommendation",
+        lifecycle: "created",
+        item_id: ITEM,
+        payload: {
+          type: "triage_result",
+          recommendation_id: id,
+          summary: "s",
+          options: [{ title: "o" }],
+        },
+      });
+    const first = rec("rec-1");
+    project(db, first);
+    project(db, rec("rec-2"));
+    const liveIds = () =>
+      db
+        .prepare("select id from recommendations where superseded_at is null")
+        .all()
+        .map((r) => r.id);
+    expect(liveIds()).toEqual(["rec-2"]);
+    // Refolding the older event (replay) must not supersede the newer rec.
+    project(db, first);
+    expect(liveIds()).toEqual(["rec-2"]);
+  });
+
+  it("a stale recommendation cannot supersede the current live recommendation", () => {
+    project(db, itemCreated());
+    project(
+      db,
+      makeEvent({
+        actor: "plugin:mock",
+        entity: "item",
+        lifecycle: "updated",
+        item_id: ITEM,
+        envelope: {
+          activity_at: "2024-01-02T00:00:00.000Z",
+          fingerprint: "fp2",
+        },
+        payload: { type: "issue_updated", local_state: "new" },
+      }),
+    );
+
+    const rec = (id, activityAt, fingerprint) =>
+      makeEvent({
+        actor: "agent",
+        entity: "recommendation",
+        lifecycle: "created",
+        item_id: ITEM,
+        payload: {
+          type: "triage_result",
+          recommendation_id: id,
+          activity_at: activityAt,
+          content_fingerprint: fingerprint,
+          summary: "s",
+          options: [{ title: "o" }],
+        },
+      });
+
+    project(db, rec("rec-2", "2024-01-02T00:00:00.000Z", "fp2"));
+    project(db, rec("rec-1", "2024-01-01T00:00:00.000Z", "fp1"));
+
+    const recommendations = db
+      .prepare("select id, superseded_at from recommendations order by id")
+      .all();
+    expect(recommendations).toMatchObject([
+      { id: "rec-1", superseded_at: expect.any(String) },
+      { id: "rec-2", superseded_at: null },
+    ]);
+    expect(
+      db.prepare("select local_state from items where id=?").get(ITEM)
+        .local_state,
+    ).toBe("recommended");
+  });
+
   it("approval.created writes a write-once approval and supersedes the rec", () => {
     project(db, itemCreated());
     project(
