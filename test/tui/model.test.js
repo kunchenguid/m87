@@ -247,7 +247,9 @@ describe("tui/buildInboxModel", () => {
 
   it("badges a re-surfaced item with open automation and exposes the running job in detail", () => {
     surfaceItem(db);
-    recommend(db, [{ title: "Wait for the fix", confidence: "high", actions: [] }]);
+    recommend(db, [
+      { title: "Wait for the fix", confidence: "high", actions: [] },
+    ]);
     db.prepare(
       `insert into jobs (id,item_id,kind,status,phase,prompt,metadata_json,created_at,updated_at)
        values ('job-1', ?, 'fix','running','waiting_for_pr','', ?, 't','t')`,

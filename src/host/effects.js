@@ -276,9 +276,7 @@ export function createEffects(ctx) {
       },
       evidence_catalog: context.evidence,
       plugin_action_catalog: actionCatalog,
-      ...(automationState
-        ? { local_automation_state: automationState }
-        : {}),
+      ...(automationState ? { local_automation_state: automationState } : {}),
       ...(userPolicy ? { user_policy: userPolicy } : {}),
       ...(spec.rerun_instructions
         ? { rerun_instructions: spec.rerun_instructions }

@@ -375,7 +375,9 @@ describe("core/projections", () => {
     );
     expect(
       db
-        .prepare("select check_attempts,next_check_at from jobs where id='job-2'")
+        .prepare(
+          "select check_attempts,next_check_at from jobs where id='job-2'",
+        )
         .get(),
     ).toMatchObject({
       check_attempts: 3,

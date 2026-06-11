@@ -142,8 +142,7 @@ describe("host/effects fix_detect (FU-15)", () => {
     );
     expect(updated.payload.check_attempts).toBe(3);
     // attempt 3 of the 30s-base backoff = 240s, still under the 300s cap
-    const delta =
-      Date.parse(updated.payload.next_check_at) - Date.now();
+    const delta = Date.parse(updated.payload.next_check_at) - Date.now();
     expect(delta).toBeGreaterThan(200_000);
     expect(delta).toBeLessThanOrEqual(240_000);
   });

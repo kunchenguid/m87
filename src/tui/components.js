@@ -204,11 +204,7 @@ function InboxPane({ model, width, height }) {
       Box,
       { flexDirection: "row" },
       h(Text, { color: theme.accent, bold: true }, "INBOX"),
-      h(
-        Text,
-        { color: theme.muted },
-        ` · ${items.length}`,
-      ),
+      h(Text, { color: theme.muted }, ` · ${items.length}`),
       h(Text, { color: theme.dim }, moreAbove ? "  ↑ more" : ""),
       h(Box, { flexGrow: 1 }),
       h(Text, { color: theme.dim }, moreBelow ? "more ↓" : ""),
