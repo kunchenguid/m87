@@ -1396,6 +1396,7 @@ daemon
   .command("run", { hidden: true })
   .description("Run the daemon loop in the foreground")
   .option("--once", "process the queue once and exit")
+  .option("--state-token <token>", "daemon identity token")
   .action(async (options) => {
     // The daemon's stdout/stderr are redirected to daemon.log by `daemon start`
     // (and by the launchd/systemd service), so this logger is the daemon's

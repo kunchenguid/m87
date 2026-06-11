@@ -15,6 +15,16 @@ export function getServiceLabel(stateDir) {
   return `com.m87.daemon.${hash}`;
 }
 
+export function getDaemonInvocationArgs(stateDir, cliEntry) {
+  return [
+    cliEntry,
+    "daemon",
+    "run",
+    "--state-token",
+    getServiceLabel(stateDir),
+  ];
+}
+
 export function isServiceDryRun() {
   const value = process.env.M87_SERVICE_DRY_RUN;
   return typeof value === "string" && value.length > 0 && value !== "0";
@@ -86,7 +96,7 @@ export function getServicePlan(stateDir, cliEntry) {
   const label = getServiceLabel(stateDir);
   const invocation = {
     program: process.execPath,
-    args: [cliEntry, "daemon", "run"],
+    args: getDaemonInvocationArgs(stateDir, cliEntry),
   };
   const logPath = join(stateDir, "daemon.log");
   const home = homedir();

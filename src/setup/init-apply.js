@@ -66,7 +66,14 @@ export async function installBundledPlugin({
   return { manifest, configure };
 }
 
-export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
+/**
+ * @param {object} plan
+ * @param {{ bundledPluginPaths: Record<string, string>, cliEntry: string, confirmDaemonPid?: (pid: number) => import("../cli/daemon-lifecycle.js").DaemonPidIdentity | boolean | Promise<import("../cli/daemon-lifecycle.js").DaemonPidIdentity | boolean> }} deps
+ */
+export async function applyInitPlan(
+  plan,
+  { bundledPluginPaths, cliEntry, confirmDaemonPid },
+) {
   const initialized = initializeCoreState({ agent: plan.agent.configValue });
   const result = {
     status: "initialized",
@@ -97,7 +104,9 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
   }
 
   if (plan.daemon.installService) {
-    const { stopped, ...service } = await installManagedService(cliEntry);
+    const { stopped, ...service } = await installManagedService(cliEntry, {
+      confirmDaemonPid,
+    });
     result.service = service;
     if (stopped) result.daemon = stopped;
     if (
@@ -124,7 +133,7 @@ export async function applyInitPlan(plan, { bundledPluginPaths, cliEntry }) {
     if (plan.daemon.startDaemon) {
       result.daemon = startDetachedDaemon(cliEntry);
     } else if (plan.daemon.stopDaemon) {
-      result.daemon = await gracefulStopDaemon();
+      result.daemon = await gracefulStopDaemon({ confirmDaemonPid });
       if (result.daemon.status === "stopping") {
         result.status = "stop_failed";
       }

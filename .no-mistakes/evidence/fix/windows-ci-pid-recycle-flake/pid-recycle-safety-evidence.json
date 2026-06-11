@@ -1,0 +1,38 @@
+{
+  "generatedAt": "2026-06-11T03:08:35.990Z",
+  "checks": [
+    {
+      "name": "stale pid owned by unrelated process",
+      "status": "passed",
+      "pid": 82424,
+      "gracefulStopResult": {
+        "status": "not_running"
+      },
+      "unrelatedProcessStillAlive": true,
+      "stalePidfileRemoved": true
+    },
+    {
+      "name": "verified daemon pid",
+      "status": "passed",
+      "pid": 82441,
+      "gracefulStopResult": {
+        "status": "stopped",
+        "pid": 82441
+      },
+      "daemonStillAlive": false
+    },
+    {
+      "name": "windows harness observed-exit cleanup",
+      "status": "passed",
+      "pid": 424242,
+      "taskkillInvoked": false,
+      "behavior": "returned before raw-pid taskkill because exitCode was already observed"
+    },
+    {
+      "name": "silent plugin failure diagnostics",
+      "status": "passed",
+      "errorName": "PluginError",
+      "errorMessage": "plugin manifest exited with code 7"
+    }
+  ]
+}

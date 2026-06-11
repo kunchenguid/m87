@@ -32,7 +32,8 @@ const { installManagedService, startDetachedDaemon } =
   await import("../../src/cli/daemon-lifecycle.js");
 const { buildInitApplyPlan, defaultInitSelections } =
   await import("../../src/setup/init-model.js");
-const { getServicePlan } = await import("../../src/cli/service.js");
+const { getDaemonInvocationArgs, getServiceLabel, getServicePlan } =
+  await import("../../src/cli/service.js");
 
 describe("init apply daemon lifecycle", () => {
   let homeDir;
@@ -40,10 +41,15 @@ describe("init apply daemon lifecycle", () => {
   let savedEnv;
 
   const cliEntry = "m87-cli.js";
+  // The daemons these tests stand in (disposable `node -e` children, mocked
+  // pids) don't have real `daemon run` command lines, so the recycled-pid
+  // identity check is satisfied explicitly.
+  const confirmDaemonPid = () => true;
   const apply = (selections, context = {}) =>
     applyInitPlan(buildInitApplyPlan(selections, context), {
       bundledPluginPaths: {},
       cliEntry,
+      confirmDaemonPid,
     });
 
   beforeEach(() => {
@@ -76,10 +82,53 @@ describe("init apply daemon lifecycle", () => {
 
   it("does not spawn another daemon when a live pid is recorded", () => {
     writeFileSync(join(stateDir, "daemon.pid"), String(process.pid));
+    execFileSync.mockReturnValue(
+      `node ${cliEntry} daemon run --state-token ${getServiceLabel(stateDir)}`,
+    );
 
     const result = startDetachedDaemon(cliEntry);
 
     expect(result).toEqual({ status: "already_running", pid: process.pid });
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("does not spawn another daemon when a live legacy pid is recorded", () => {
+    writeFileSync(join(stateDir, "daemon.pid"), String(process.pid));
+    execFileSync.mockReturnValue(`node ${cliEntry} daemon run`);
+
+    const result = startDetachedDaemon(cliEntry);
+
+    expect(result).toEqual({ status: "already_running", pid: process.pid });
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("starts a daemon when the live pidfile is not a daemon", () => {
+    const pidPath = join(stateDir, "daemon.pid");
+    writeFileSync(pidPath, String(process.pid));
+    execFileSync.mockReturnValue(`node ${cliEntry}`);
+
+    const result = startDetachedDaemon(cliEntry);
+
+    expect(result).toMatchObject({ status: "started", pid: 12345 });
+    expect(existsSync(pidPath)).toBe(false);
+    expect(spawn).toHaveBeenCalledWith(
+      process.execPath,
+      getDaemonInvocationArgs(stateDir, cliEntry),
+      expect.objectContaining({ detached: true }),
+    );
+  });
+
+  it("does not start another daemon when pid identity is unknown", () => {
+    const pidPath = join(stateDir, "daemon.pid");
+    writeFileSync(pidPath, String(process.pid));
+    execFileSync.mockImplementation(() => {
+      throw new Error("probe failed");
+    });
+
+    const result = startDetachedDaemon(cliEntry);
+
+    expect(result).toEqual({ status: "already_running", pid: process.pid });
+    expect(existsSync(pidPath)).toBe(true);
     expect(spawn).not.toHaveBeenCalled();
   });
 
@@ -89,8 +138,15 @@ describe("init apply daemon lifecycle", () => {
     const child = execFile(process.execPath, [
       "-e",
       "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
     ]);
     writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    execFileSync.mockReturnValue(
+      `node ${cliEntry} daemon run --state-token ${getServiceLabel(stateDir)}`,
+    );
 
     try {
       const result = await apply(defaultInitSelections());
@@ -113,6 +169,10 @@ describe("init apply daemon lifecycle", () => {
     const child = execFile(process.execPath, [
       "-e",
       "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
     ]);
     writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
     process.env.M87_SERVICE_DRY_RUN = "0";
@@ -121,7 +181,9 @@ describe("init apply daemon lifecycle", () => {
     });
 
     try {
-      const result = await installManagedService(cliEntry);
+      const result = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(result).toMatchObject({
         status: "activation_failed",
@@ -136,7 +198,7 @@ describe("init apply daemon lifecycle", () => {
       expect(existsSync(servicePlan.unitPath)).toBe(false);
       expect(spawn).toHaveBeenCalledWith(
         process.execPath,
-        [cliEntry, "daemon", "run"],
+        getDaemonInvocationArgs(stateDir, cliEntry),
         expect.objectContaining({ detached: true }),
       );
     } finally {
@@ -158,7 +220,9 @@ describe("init apply daemon lifecycle", () => {
     writeFileSync(join(stateDir, "daemon.pid"), String(firstChild.pid));
 
     try {
-      const firstResult = await installManagedService(cliEntry);
+      const firstResult = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(firstResult).toMatchObject({
         status: "activation_failed",
@@ -181,7 +245,9 @@ describe("init apply daemon lifecycle", () => {
     writeFileSync(join(stateDir, "daemon.pid"), String(retryChild.pid));
 
     try {
-      const retryResult = await installManagedService(cliEntry);
+      const retryResult = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(retryResult).toMatchObject({
         status: "activation_failed",
@@ -192,7 +258,7 @@ describe("init apply daemon lifecycle", () => {
       expect(existsSync(servicePlan.unitPath)).toBe(false);
       expect(spawn).toHaveBeenCalledWith(
         process.execPath,
-        [cliEntry, "daemon", "run"],
+        getDaemonInvocationArgs(stateDir, cliEntry),
         expect.objectContaining({ detached: true }),
       );
     } finally {
@@ -217,7 +283,9 @@ describe("init apply daemon lifecycle", () => {
     });
 
     try {
-      const result = await installManagedService(cliEntry);
+      const result = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(result).toMatchObject({
         status: "activation_failed",
@@ -242,7 +310,7 @@ describe("init apply daemon lifecycle", () => {
       throw new Error("activate failed");
     });
 
-    const result = await installManagedService(cliEntry);
+    const result = await installManagedService(cliEntry, { confirmDaemonPid });
 
     expect(result.status).toBe("installed");
     expect(result.activation).toBe("write_only_activation_failed");
@@ -292,7 +360,9 @@ describe("init apply daemon lifecycle", () => {
     vi.useFakeTimers();
 
     try {
-      const resultPromise = installManagedService(cliEntry);
+      const resultPromise = installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
       await vi.runAllTimersAsync();
       const result = await resultPromise;
 
@@ -414,8 +484,15 @@ describe("init apply daemon lifecycle", () => {
     const child = execFile(process.execPath, [
       "-e",
       "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
     ]);
     writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    execFileSync.mockReturnValue(
+      `node ${cliEntry} daemon run --state-token ${getServiceLabel(stateDir)}`,
+    );
 
     try {
       const result = await apply(

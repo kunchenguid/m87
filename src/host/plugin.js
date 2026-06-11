@@ -42,14 +42,23 @@ export async function runPluginCommand(binaryPath, command, input) {
       let stderr = "";
       child.stdout.on("data", (c) => (stdout += c));
       child.stderr.on("data", (c) => (stderr += c));
+      // A plugin may exit without draining stdin (manifest does); the broken
+      // pipe must not crash the host, and `close` below still settles the
+      // promise either way.
+      child.stdin.on("error", () => {});
       child.on("error", reject);
-      child.on("close", (code) => {
+      child.on("close", (code, signal) => {
         if (code === 0) {
           resolve(stdout);
           return;
         }
+        // A killed process reports no stderr; name the exit cause so failures
+        // like an externally terminated plugin are diagnosable from the log.
+        const exit = signal
+          ? `killed with ${signal}`
+          : `exited with code ${code}`;
         const err = Object.assign(
-          new Error(stderr.trim() || `plugin command failed: ${command}`),
+          new Error(stderr.trim() || `plugin ${command} ${exit}`),
           { stderr },
         );
         reject(err);
