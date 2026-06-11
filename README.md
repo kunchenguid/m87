@@ -162,7 +162,7 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 | `m87 retention policy`            | Show local data retention settings                           |
 | `m87 retention set <field> <ttl>` | Change a retention setting                                   |
 | `m87 retention cleanup`           | Purge data expired by the retention policy                   |
-| `m87 update [--check]`            | Check for and install a newer release from npm               |
+| `m87 update [--check]`            | Check for or install a newer npm release                     |
 
 ### Flags
 
@@ -260,7 +260,7 @@ Run `m87 status` to see the resolved agent.
 ```sh
 m87 daemon run            # foreground; logs every sync/triage/warn until Ctrl-C
 m87 daemon start          # detached background process
-m87 daemon status         # report whether the daemon is running
+m87 daemon status         # report running, stale, and installed versions
 m87 daemon install        # managed OS service: launchd / systemd --user / schtasks
 m87 daemon uninstall
 ```
@@ -268,7 +268,15 @@ m87 daemon uninstall
 A detached or managed daemon writes operational logs to `~/.m87/daemon.log`, including startup, shutdown, loop errors, sync failures, and sync recovery.
 Installing the managed service stops any session daemon first, then lets the service own the background process so only one daemon works on the local state.
 If `m87 daemon restart` cannot stop the old daemon within its stop window, it reports `stop_failed` instead of starting another daemon.
+When the managed service is installed, `m87 daemon restart` bounces the daemon through the service manager, since the manager respawns any daemon that exits on its own.
 Failed source syncs are retried with backoff instead of being parked forever; a plugin returns to active after a later successful sync.
+
+A running daemon keeps executing the code it loaded at startup, so a package upgrade alone would leave it on stale code.
+The daemon therefore watches the installed `package.json` (once a minute) and, when the version on disk no longer matches the one in memory, drains and restarts itself onto the new code: it schedules no new work, lets in-flight agent turns finish (bounded), and then respawns - through the service manager when the managed service is installed, as a fresh detached process otherwise.
+Durable queued events are simply picked up by the upgraded daemon, so nothing is lost across the restart.
+`m87 update` restarts the daemon immediately after a successful install without waiting for that detection.
+`m87 update --check` only reports whether an update is available and never changes the daemon.
+`m87 daemon status` compares the daemon's reported version against the installed CLI and reports `running_stale` with a restart hint when they differ - normally a transient state that the self-restart resolves within a minute or two.
 
 A managed daemon launched from a GUI context inherits a minimal `PATH`, so `m87` resolves your login-shell environment at startup to find `gh`, `git`, and provider CLIs.
 Set `M87_SKIP_SHELLENV=1` to disable that resolution.

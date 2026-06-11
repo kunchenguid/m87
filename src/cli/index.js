@@ -51,6 +51,8 @@ import {
 import {
   gracefulStopDaemon,
   installManagedService,
+  managedServiceExists,
+  restartDaemon,
   runningDaemonPid,
   startDetachedDaemon,
   uninstallManagedService,
@@ -59,6 +61,7 @@ import { getStatePaths, loadConfig, saveConfig } from "./state.js";
 import { openRuntime, runOnce } from "./runtime.js";
 import { getServicePlan } from "./service.js";
 import { compareSemver, fetchLatestVersion, isUpdateDryRun } from "./update.js";
+import { createUpgradeWatcher } from "./upgrade-watch.js";
 import { recommendationDetail } from "../core/views.js";
 import { renderInboxView } from "../tui/render.js";
 import { applyInitPlan, initializeCoreState } from "../setup/init-apply.js";
@@ -136,8 +139,8 @@ async function pollFor(
 }
 
 // Ask the running daemon to sync immediately over the control channel. Returns
-// false if the daemon can't be reached (then the caller falls back to a short
-// poll, since the daemon syncs on its own tick regardless).
+// whether the daemon accepted the request, plus an error when it deliberately
+// rejects new work while draining for an upgrade restart.
 async function requestDaemonSync() {
   try {
     const reply = await sendControl(
@@ -145,9 +148,13 @@ async function requestDaemonSync() {
       { cmd: "sync" },
       { timeoutMs: 3000 },
     );
-    return Boolean(reply && reply.ok);
+    if (reply && reply.ok) return { accepted: true };
+    if (reply && reply.ok === false) {
+      return { accepted: false, error: String(reply.error ?? "sync rejected") };
+    }
+    return { accepted: false };
   } catch {
-    return false;
+    return { accepted: false };
   }
 }
 
@@ -514,7 +521,12 @@ plugin
       return fail(`plugin not installed: ${pluginId}`);
     }
     const before = record.last_sync_at;
-    const nudged = await requestDaemonSync();
+    const syncRequest = await requestDaemonSync();
+    if (syncRequest.error) {
+      db.close();
+      return fail(syncRequest.error);
+    }
+    const nudged = syncRequest.accepted;
     const synced = await pollFor(
       () => {
         const r = db
@@ -572,7 +584,12 @@ program
     if (!pid) return;
     const db = openDb();
     const before = db.prepare("select count(*) c from events").get().c;
-    const nudged = await requestDaemonSync();
+    const syncRequest = await requestDaemonSync();
+    if (syncRequest.error) {
+      db.close();
+      return fail(syncRequest.error);
+    }
+    const nudged = syncRequest.accepted;
     // wait for the event log to advance (sync produced facts) or settle
     await pollFor(
       () => {
@@ -1455,6 +1472,17 @@ daemon
       stopping = true;
       controller.abort();
     };
+    // A package upgrade replaces the files on disk while this process keeps
+    // executing the old code from memory. The watcher notices the installed
+    // version changing; the daemon then drains (schedules nothing new, lets
+    // in-flight effects finish) and restarts itself onto the new code.
+    const upgradeWatcher = createUpgradeWatcher({
+      entryPath: CLI_ENTRY,
+      name: pkg.name,
+      currentVersion: pkg.version,
+    });
+    let upgradeTo = null;
+    let drainDeadline = 0;
     // Terminal/service signals trigger graceful shutdown on POSIX. Windows has
     // no POSIX signals, so there the control channel's "stop" command is the
     // graceful path (see `m87 daemon stop`).
@@ -1468,6 +1496,11 @@ daemon
     // graceful shutdown. This replaces the POSIX-only SIGUSR1/SIGTERM IPC.
     const control = await createControlServer(controlAddress, async (msg) => {
       if (msg && msg.cmd === "sync") {
+        if (upgradeTo !== null) {
+          // Draining for an upgrade restart: new work would only delay the
+          // handover, and the replacement daemon syncs at startup anyway.
+          return { ok: false, error: "daemon restarting after upgrade" };
+        }
         await scheduleSync(runtime);
         return { ok: true };
       }
@@ -1476,7 +1509,14 @@ daemon
         return { ok: true };
       }
       if (msg && msg.cmd === "ping") {
-        return { ok: true, pid: process.pid };
+        // The version lets clients detect a daemon left running across an
+        // `npm install -g` upgrade, still executing the old code from memory.
+        return {
+          ok: true,
+          pid: process.pid,
+          version: pkg.version,
+          restarting: upgradeTo !== null,
+        };
       }
       return { ok: false, error: `unknown command: ${msg && msg.cmd}` };
     });
@@ -1494,9 +1534,35 @@ daemon
         signal: controller.signal,
         tickMs: 1000,
         onTick: async () => {
+          const nowMs = Date.now();
+          if (upgradeTo === null && !stopping) {
+            const next = upgradeWatcher.check(nowMs);
+            if (next !== null) {
+              upgradeTo = next;
+              // Bounded drain: in-flight agent turns get a generous window to
+              // finish, but a wedged effect cannot hold the upgrade hostage -
+              // past the deadline the abort tears it down exactly like
+              // `daemon stop` would, and the queue's retry handles the rest.
+              drainDeadline = nowMs + 15 * 60_000;
+              logger.info("upgrade detected, draining", {
+                from: pkg.version,
+                to: next,
+                in_flight: runtime.loop.inFlight,
+              });
+            }
+          }
+          if (upgradeTo !== null) {
+            // Schedule nothing new while draining. Queued events are durable,
+            // so anything not yet processed is simply picked up by the
+            // upgraded daemon after the restart.
+            if (runtime.loop.inFlight === 0 || nowMs >= drainDeadline) {
+              controller.abort();
+            }
+            return false;
+          }
           const interval = (runtime.config.poll_interval ?? 300) * 1000;
-          if (Date.now() - lastSync >= interval) {
-            lastSync = Date.now();
+          if (nowMs - lastSync >= interval) {
+            lastSync = nowMs;
             await scheduleSync(runtime);
           }
           // PR probes run on their own per-job backoff clock (next_check_at),
@@ -1505,8 +1571,8 @@ daemon
           schedulePrChecks(runtime);
           // The scheduler owns retention sweeps (plan §4). Hourly is plenty:
           // every TTL is measured in days.
-          if (Date.now() - lastSweep >= 3_600_000) {
-            lastSweep = Date.now();
+          if (nowMs - lastSweep >= 3_600_000) {
+            lastSweep = nowMs;
             sweepRetention(runtime.db, { stateDir: runtime.stateDir });
           }
         },
@@ -1522,6 +1588,29 @@ daemon
       ]);
       runtime.db.close();
       cleanupPid(pidPath);
+    }
+    // An operator stop that raced the drain wins: the user asked for a
+    // stopped daemon, so do not respawn behind their back.
+    if (upgradeTo !== null && !stopping) {
+      logger.info("daemon restarting after upgrade", {
+        from: pkg.version,
+        to: upgradeTo,
+      });
+      const plan = getServicePlan(getStatePaths().stateDir, CLI_ENTRY);
+      if (
+        plan !== null &&
+        existsSync(plan.unitPath) &&
+        plan.manager !== "schtasks"
+      ) {
+        // launchd (KeepAlive) respawns on any exit and systemd
+        // (Restart=on-failure) on a non-zero one, so exiting non-zero makes
+        // both managers spawn a fresh daemon from the upgraded install.
+        process.exit(1);
+      }
+      // Session daemon (and schtasks, which only starts at logon): spawn the
+      // detached replacement ourselves. The pid file was cleaned up above, so
+      // this cannot short-circuit on "already running".
+      startDetachedDaemon(CLI_ENTRY);
     }
     // Force exit: an abandoned in-flight agent subprocess can keep stdio pipes
     // open and ref the event loop, so we cannot rely on natural drain here.
@@ -1592,32 +1681,51 @@ daemon
 daemon
   .command("status")
   .description("Show whether the daemon is running")
-  .action(() => {
+  .action(async () => {
     const pid = runningDaemonPid();
-    if (pid !== null) {
-      return out({ status: "running", running: true, pid });
+    if (pid === null) {
+      return out({ status: "not_running", running: false });
     }
-    out({ status: "not_running", running: false });
+    // A daemon keeps running the code it loaded at startup, so after an
+    // `npm install -g` upgrade it can be live but stale. Ask it for its
+    // version over the control channel and surface the mismatch.
+    let daemonVersion = null;
+    try {
+      const reply = await sendControl(
+        getStatePaths().controlAddress,
+        { cmd: "ping" },
+        { timeoutMs: 3000 },
+      );
+      if (reply?.ok && typeof reply.version === "string") {
+        daemonVersion = reply.version;
+      }
+    } catch {
+      // Control channel unreachable (e.g. a daemon predating it); the pid
+      // check above already established liveness.
+    }
+    const stale = daemonVersion !== null && daemonVersion !== pkg.version;
+    const result = {
+      status: stale ? "running_stale" : "running",
+      running: true,
+      pid,
+      version: daemonVersion,
+      cli_version: pkg.version,
+    };
+    if (stale) {
+      result.hint = `daemon is on ${daemonVersion} but ${pkg.version} is installed; run \`m87 daemon restart\``;
+    }
+    out(result);
   });
 
 daemon
   .command("restart")
   .description("Restart the background daemon")
   .action(async () => {
-    const stopped = await gracefulStopDaemon();
-    const started = startDetachedDaemon(CLI_ENTRY);
-    if (started.status !== "started") {
-      // The old daemon survived the stop window; report it rather than
-      // stacking a second instance on top of it.
+    const result = await restartDaemon(CLI_ENTRY);
+    if (result.status !== "restarted") {
       process.exitCode = 1;
-      return out({ status: "stop_failed", pid: started.pid });
     }
-    out({
-      status: "restarted",
-      pid: started.pid,
-      log: started.log,
-      stopped: stopped.pid ?? null,
-    });
+    out(result);
   });
 
 daemon
@@ -1666,7 +1774,8 @@ program
     if (compareSemver(current, latest) >= 0) {
       return out({ status: "up_to_date", current, latest });
     }
-    const command = `npm install -g @kunchenguid/m87@${latest}`;
+    const spec = `${pkg.name}@${latest}`;
+    const command = `npm install -g ${spec}`;
     if (options.check || isUpdateDryRun()) {
       return out({
         status: "update_available",
@@ -1677,14 +1786,16 @@ program
       });
     }
     try {
-      execFileSync("npm", ["install", "-g", `m87@${latest}`], {
+      execFileSync("npm", ["install", "-g", spec], {
         stdio: "ignore",
         timeout: 120000,
+        // npm is npm.cmd on Windows, which execFileSync refuses to spawn
+        // without a shell.
+        shell: process.platform === "win32",
       });
-      out({ status: "updated", current, latest, command, applied: true });
     } catch (err) {
       process.exitCode = 1;
-      out({
+      return out({
         status: "update_failed",
         current,
         latest,
@@ -1693,6 +1804,24 @@ program
         reason: err.message,
       });
     }
+    // A live daemon still runs the old code from memory; bounce it onto the
+    // freshly installed code. npm replaces the package in place, so CLI_ENTRY
+    // now points at the new version.
+    let daemonResult = { status: "not_running" };
+    if (runningDaemonPid() !== null || managedServiceExists(CLI_ENTRY)) {
+      daemonResult = await restartDaemon(CLI_ENTRY);
+      if (daemonResult.status !== "restarted") {
+        process.exitCode = 1;
+      }
+    }
+    out({
+      status: "updated",
+      current,
+      latest,
+      command,
+      applied: true,
+      daemon: daemonResult,
+    });
   });
 
 export function run(argv = process.argv) {

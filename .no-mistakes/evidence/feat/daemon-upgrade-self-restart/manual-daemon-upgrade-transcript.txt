@@ -1,0 +1,55 @@
+$ m87 init
+status: initialized
+state_dir: >-
+  /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-manual-upgrade-0N2H4M/home/.m87
+
+$ m87 daemon start
+status: started
+pid: 69864
+log: >-
+  /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-manual-upgrade-0N2H4M/home/.m87/daemon.log
+
+$ m87 update
+status: updated
+current: 0.1.8
+latest: 99.0.0
+command: npm install -g @kunchenguid/m87@99.0.0
+applied: true
+daemon:
+  status: restarted
+  pid: 69872
+  log: >-
+    /var/folders/5x/4nqprlbx0518k3ybcb1sz6gr0000gn/T/m87-manual-upgrade-0N2H4M/home/.m87/daemon.log
+  stopped: 69864
+
+observed: old daemon pid 69864, replacement pid 69872
+
+npm shim received: install -g @kunchenguid/m87@99.0.0
+
+$ m87 daemon status
+status: running
+running: true
+pid: 69872
+version: 0.1.8
+cli_version: 0.1.8
+
+observed: daemon self-restarted from pid 69872 to pid 69889 after probe version changed
+
+$ m87 daemon status
+status: running
+running: true
+pid: 69889
+version: 0.1.8
+cli_version: 0.1.8
+
+$ m87 daemon stop
+status: stopped
+pid: 69889
+
+$ m87 daemon status  # simulated older daemon answering ping
+status: running_stale
+running: true
+pid: 70136
+version: 0.0.1
+cli_version: 0.1.8
+hint: daemon is on 0.0.1 but 0.1.8 is installed; run `m87 daemon restart`

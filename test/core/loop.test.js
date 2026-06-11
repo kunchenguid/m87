@@ -237,4 +237,23 @@ describe("core/loop (integration)", () => {
     );
     expect(pendingCount(db)).toBe(0);
   });
+
+  it("can pause daemon queue processing from onTick", async () => {
+    const controller = new AbortController();
+    const loop = createLoop({ db, effects: fakeEffects });
+    enqueue(db, itemCreated());
+
+    const running = loop.runForever({
+      signal: controller.signal,
+      tickMs: 1,
+      onTick: () => false,
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+    controller.abort();
+    await running;
+
+    expect(pendingCount(db)).toBe(1);
+    expect(db.prepare("select count(*) c from items").get().c).toBe(0);
+  });
 });

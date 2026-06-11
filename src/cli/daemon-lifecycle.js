@@ -161,6 +161,93 @@ export function startDetachedDaemon(cliEntry) {
   return { status: "started", pid: child.pid, log: logPath };
 }
 
+// True when a managed service unit exists for this state dir, meaning the
+// service manager - not the CLI - owns the daemon process.
+export function managedServiceExists(cliEntry) {
+  const { stateDir } = getStatePaths();
+  const plan = getServicePlan(stateDir, cliEntry);
+  return plan !== null && existsSync(plan.unitPath);
+}
+
+// Restart the daemon so it runs the code currently installed at `cliEntry`.
+// A service-managed daemon is respawned by its manager whenever it exits
+// (launchd KeepAlive, systemd Restart), so stopping it directly and spawning
+// a detached replacement would race the manager and stack two daemons.
+// Instead the restart goes through the manager: deactivate, stop any
+// straggler the manager does not own (schtasks never stops the process),
+// then activate so the manager spawns the fresh code.
+/**
+ * @param {string} cliEntry
+ * @param {{ confirmDaemonPid?: (pid: number) => DaemonPidIdentity | boolean | Promise<DaemonPidIdentity | boolean>, stopDaemon?: typeof gracefulStopDaemon }} [options]
+ */
+export async function restartDaemon(
+  cliEntry,
+  { confirmDaemonPid, stopDaemon = gracefulStopDaemon } = {},
+) {
+  const { stateDir } = getStatePaths();
+  const plan = getServicePlan(stateDir, cliEntry);
+  if (
+    plan !== null &&
+    plan.manager !== "schtasks" &&
+    existsSync(plan.unitPath)
+  ) {
+    if (!isServiceDryRun()) {
+      try {
+        execFileSync(plan.deactivate.command, plan.deactivate.args, {
+          stdio: "ignore",
+          timeout: 15000,
+        });
+      } catch {
+        // The unit may not be loaded (e.g. written but never activated);
+        // activation below is the step that has to succeed.
+      }
+    }
+    const stopped = await stopDaemon({ confirmDaemonPid });
+    if (stopped.status === "stopping") {
+      return {
+        status: "stop_failed",
+        manager: plan.manager,
+        unit: plan.unitPath,
+        stopped,
+      };
+    }
+    if (!isServiceDryRun()) {
+      try {
+        execFileSync(plan.activate.command, plan.activate.args, {
+          stdio: "ignore",
+          timeout: 15000,
+        });
+      } catch (err) {
+        return {
+          status: "restart_failed",
+          manager: plan.manager,
+          unit: plan.unitPath,
+          reason: String(err?.message ?? err),
+        };
+      }
+    }
+    return {
+      status: "restarted",
+      manager: plan.manager,
+      unit: plan.unitPath,
+      stopped: stopped.pid ?? null,
+    };
+  }
+  const stopped = await stopDaemon({ confirmDaemonPid });
+  const started = startDetachedDaemon(cliEntry);
+  if (started.status !== "started") {
+    // The old daemon survived the stop window; report it rather than
+    // stacking a second instance on top of it.
+    return { status: "stop_failed", pid: started.pid };
+  }
+  return {
+    status: "restarted",
+    pid: started.pid,
+    log: started.log,
+    stopped: stopped.pid ?? null,
+  };
+}
+
 // Write and activate the managed login service. A session daemon and the
 // service-spawned daemon would fight over the pid file and control socket
 // (the newcomer silently hijacks both, orphaning the older process while the

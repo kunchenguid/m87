@@ -1,0 +1,14 @@
+
+ RUN  v4.1.5 /Users/kunchen/.no-mistakes/worktrees/65a99c59c7f2/01KTW16PAMVRAKCRCYAFJY4ZJB
+
+ ✓ test/e2e/update-restart.test.js > e2e: update restarts the daemon onto the new install > installs the scoped package and restarts the running daemon 2503ms
+ ✓ test/e2e/update-restart.test.js > e2e: update restarts the daemon onto the new install > update leaves a stopped daemon stopped 362ms
+ ✓ test/e2e/update-restart.test.js > e2e: update restarts the daemon onto the new install > daemon status reports running_stale for a daemon on another version 161ms
+ ✓ test/e2e/daemon-upgrade.test.js > e2e: daemon restarts itself when the installed version changes > drains, respawns onto the new install, and survives as a new process 4431ms
+ ✓ test/e2e/daemon-upgrade.test.js > e2e: daemon restarts itself when the installed version changes > lets an in-flight agent turn finish before restarting 9608ms
+
+ Test Files  2 passed (2)
+      Tests  5 passed (5)
+   Start at  12:20:11
+   Duration  14.14s (transform 31ms, setup 0ms, import 59ms, tests 17.07s, environment 0ms)
+
