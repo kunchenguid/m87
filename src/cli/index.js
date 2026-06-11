@@ -148,9 +148,13 @@ async function requestDaemonSync() {
       { cmd: "sync" },
       { timeoutMs: 3000 },
     );
-    return Boolean(reply && reply.ok);
+    if (reply && reply.ok) return { accepted: true };
+    if (reply && reply.ok === false) {
+      return { accepted: false, error: String(reply.error ?? "sync rejected") };
+    }
+    return { accepted: false };
   } catch {
-    return false;
+    return { accepted: false };
   }
 }
 
@@ -517,7 +521,12 @@ plugin
       return fail(`plugin not installed: ${pluginId}`);
     }
     const before = record.last_sync_at;
-    const nudged = await requestDaemonSync();
+    const syncRequest = await requestDaemonSync();
+    if (syncRequest.error) {
+      db.close();
+      return fail(syncRequest.error);
+    }
+    const nudged = syncRequest.accepted;
     const synced = await pollFor(
       () => {
         const r = db
@@ -575,7 +584,12 @@ program
     if (!pid) return;
     const db = openDb();
     const before = db.prepare("select count(*) c from events").get().c;
-    const nudged = await requestDaemonSync();
+    const syncRequest = await requestDaemonSync();
+    if (syncRequest.error) {
+      db.close();
+      return fail(syncRequest.error);
+    }
+    const nudged = syncRequest.accepted;
     // wait for the event log to advance (sync produced facts) or settle
     await pollFor(
       () => {

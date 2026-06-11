@@ -173,6 +173,17 @@ describe("e2e: daemon restarts itself when the installed version changes", () =>
     expect(turnInFlight, daemonLog()).toBe(true);
 
     writeProbe("99.0.0");
+    const rejectedSync = await waitFor(async () => {
+      try {
+        await m87("sync");
+        return null;
+      } catch (err) {
+        return err.stderr.includes("daemon restarting after upgrade")
+          ? err
+          : null;
+      }
+    });
+    expect(rejectedSync.code).toBe(1);
     const newPid = await waitFor(
       () => {
         const pid = daemonPid();

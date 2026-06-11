@@ -186,6 +186,39 @@ describe("cli/daemon-lifecycle restartDaemon with a managed service", () => {
     expect(existsSync(join(stateDir, "daemon.pid"))).toBe(false);
   });
 
+  it("does not reactivate a service when the old daemon is still stopping", async () => {
+    const plan = getServicePlan(stateDir, cliEntry);
+    mkdirSync(dirname(plan.unitPath), { recursive: true });
+    writeFileSync(plan.unitPath, plan.content);
+    const readyPath = join(stateDir, "fake-daemon-ready");
+    const child = execFile(process.execPath, [
+      "-e",
+      `require('node:fs').writeFileSync(${JSON.stringify(readyPath)}, '1'); process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)`,
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+
+    try {
+      for (let i = 0; i < 50 && !existsSync(readyPath); i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      const result = await restartDaemon(cliEntry);
+
+      expect(result).toEqual({
+        status: "stop_failed",
+        manager: plan.manager,
+        unit: plan.unitPath,
+        stopped: { status: "stopping", pid: child.pid },
+      });
+      expect(isAlive(child.pid)).toBe(true);
+    } finally {
+      child.kill("SIGKILL");
+    }
+  });
+
   it("reports no managed service when no unit exists", () => {
     expect(managedServiceExists(cliEntry)).toBe(false);
   });
