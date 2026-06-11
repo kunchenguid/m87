@@ -5,6 +5,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  rmSync,
 } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -38,6 +39,11 @@ export function runningDaemonPid() {
   if (!existsSync(pidPath)) return null;
   const pid = Number(readFileSync(pidPath, "utf8"));
   return Number.isInteger(pid) && pid > 0 && isAlive(pid) ? pid : null;
+}
+
+function forgetDaemonPid() {
+  const { pidPath } = getStatePaths();
+  rmSync(pidPath, { force: true });
 }
 
 // A stale pid file can record a pid the OS has since recycled into an
@@ -93,7 +99,10 @@ export async function gracefulStopDaemon({
     // Control channel unreachable (e.g. a pre-socket daemon): fall back to a
     // signal, but only onto a verified daemon process - never a pid the OS
     // recycled into something else.
-    if (!(await confirmDaemonPid(pid))) return { status: "not_running" };
+    if (!(await confirmDaemonPid(pid))) {
+      forgetDaemonPid();
+      return { status: "not_running" };
+    }
     try {
       process.kill(pid, "SIGTERM");
     } catch {
@@ -113,7 +122,10 @@ export async function gracefulStopDaemon({
 export function startDetachedDaemon(cliEntry) {
   const { logPath, stateDir } = getStatePaths();
   const pid = runningDaemonPid();
-  if (pid !== null) return { status: "already_running", pid };
+  if (pid !== null) {
+    if (pidLooksLikeDaemon(pid)) return { status: "already_running", pid };
+    forgetDaemonPid();
+  }
   mkdirSync(dirname(logPath), { recursive: true });
   const logFd = openSync(logPath, "a");
   let child;

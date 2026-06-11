@@ -1,5 +1,11 @@
 import { execFile } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -50,6 +56,7 @@ describe("cli/daemon-lifecycle signal fallback identity check", () => {
 
     expect(result).toEqual({ status: "not_running" });
     expect(isAlive(child.pid)).toBe(true);
+    expect(existsSync(join(stateDir, "daemon.pid"))).toBe(false);
   });
 
   it("refuses to signal a daemon for a different state dir", async () => {
@@ -67,6 +74,7 @@ describe("cli/daemon-lifecycle signal fallback identity check", () => {
 
     expect(result).toEqual({ status: "not_running" });
     expect(isAlive(child.pid)).toBe(true);
+    expect(existsSync(join(stateDir, "daemon.pid"))).toBe(false);
   });
 
   it("stops a verified daemon process via the signal fallback", async () => {

@@ -32,7 +32,7 @@ const { installManagedService, startDetachedDaemon } =
   await import("../../src/cli/daemon-lifecycle.js");
 const { buildInitApplyPlan, defaultInitSelections } =
   await import("../../src/setup/init-model.js");
-const { getDaemonInvocationArgs, getServicePlan } =
+const { getDaemonInvocationArgs, getServiceLabel, getServicePlan } =
   await import("../../src/cli/service.js");
 
 describe("init apply daemon lifecycle", () => {
@@ -82,11 +82,30 @@ describe("init apply daemon lifecycle", () => {
 
   it("does not spawn another daemon when a live pid is recorded", () => {
     writeFileSync(join(stateDir, "daemon.pid"), String(process.pid));
+    execFileSync.mockReturnValue(
+      `node ${cliEntry} daemon run --state-token ${getServiceLabel(stateDir)}`,
+    );
 
     const result = startDetachedDaemon(cliEntry);
 
     expect(result).toEqual({ status: "already_running", pid: process.pid });
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("starts a daemon when the live pidfile is not a daemon", () => {
+    const pidPath = join(stateDir, "daemon.pid");
+    writeFileSync(pidPath, String(process.pid));
+    execFileSync.mockReturnValue(`node ${cliEntry}`);
+
+    const result = startDetachedDaemon(cliEntry);
+
+    expect(result).toMatchObject({ status: "started", pid: 12345 });
+    expect(existsSync(pidPath)).toBe(false);
+    expect(spawn).toHaveBeenCalledWith(
+      process.execPath,
+      getDaemonInvocationArgs(stateDir, cliEntry),
+      expect.objectContaining({ detached: true }),
+    );
   });
 
   it("stops a session daemon before handing over to the managed service", async () => {
@@ -95,8 +114,15 @@ describe("init apply daemon lifecycle", () => {
     const child = execFile(process.execPath, [
       "-e",
       "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
     ]);
     writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    execFileSync.mockReturnValue(
+      `node ${cliEntry} daemon run --state-token ${getServiceLabel(stateDir)}`,
+    );
 
     try {
       const result = await apply(defaultInitSelections());
@@ -119,6 +145,10 @@ describe("init apply daemon lifecycle", () => {
     const child = execFile(process.execPath, [
       "-e",
       "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
     ]);
     writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
     process.env.M87_SERVICE_DRY_RUN = "0";
@@ -430,8 +460,15 @@ describe("init apply daemon lifecycle", () => {
     const child = execFile(process.execPath, [
       "-e",
       "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
     ]);
     writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+    execFileSync.mockReturnValue(
+      `node ${cliEntry} daemon run --state-token ${getServiceLabel(stateDir)}`,
+    );
 
     try {
       const result = await apply(
