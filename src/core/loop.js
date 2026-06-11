@@ -141,10 +141,17 @@ export function createLoop({
   } = {}) {
     loopSignal = signal;
     while (!signal?.aborted) {
-      processDueBatch();
+      let shouldProcess = true;
       if (onTick) {
-        await onTick({ enqueue: (e, opts) => enqueue(db, e, opts) });
+        shouldProcess =
+          (await onTick({ enqueue: (e, opts) => enqueue(db, e, opts) })) !==
+          false;
       }
+      if (!shouldProcess) {
+        await sleep(tickMs);
+        continue;
+      }
+      processDueBatch();
       if (inFlight.size > 0) {
         await Promise.race([...inFlight, sleep(tickMs)]);
         continue;

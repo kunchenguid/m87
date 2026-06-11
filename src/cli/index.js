@@ -1544,7 +1544,7 @@ daemon
             if (runtime.loop.inFlight === 0 || nowMs >= drainDeadline) {
               controller.abort();
             }
-            return;
+            return false;
           }
           const interval = (runtime.config.poll_interval ?? 300) * 1000;
           if (nowMs - lastSync >= interval) {
