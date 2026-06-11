@@ -45,7 +45,7 @@ const reducers = {
 
   // job.created payload: { job_id, kind, recommendation_id?, option_id?, approval_id?, prompt?, metadata? }
   "job.created": (db, e) => upsertJob(db, e, { created: true }),
-  // job.updated payload: { job_id, phase?, status?, metadata? }
+  // job.updated payload: { job_id, phase?, status?, metadata?, check_attempts?, next_check_at? }
   "job.updated": (db, e) => upsertJob(db, e, {}),
   // job.closed payload: { job_id, status:'succeeded'|'failed', phase?, error?, metadata? }
   "job.closed": (db, e) => upsertJob(db, e, { closed: true }),
@@ -370,7 +370,8 @@ function upsertJob(db, e, { created = false, closed = false }) {
     : (p.status ?? existing.status);
   db.prepare(
     `update jobs set status=?, phase=?, error=?, metadata_json=?, source_event_id=?,
-       updated_at=?, started_at=coalesce(started_at, ?), completed_at=?
+       updated_at=?, started_at=coalesce(started_at, ?), completed_at=?,
+       check_attempts=?, next_check_at=?
      where id=?`,
   ).run(
     status,
@@ -383,6 +384,10 @@ function upsertJob(db, e, { created = false, closed = false }) {
     now,
     existing.started_at ? null : now,
     closed ? now : existing.completed_at,
+    p.check_attempts ?? existing.check_attempts ?? 0,
+    // A closed job leaves the probe rotation; otherwise keep the schedule
+    // unless the event carries a new one.
+    closed ? null : (p.next_check_at ?? existing.next_check_at),
     id,
   );
 }

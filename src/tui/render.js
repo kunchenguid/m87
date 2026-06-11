@@ -1,6 +1,7 @@
 import {
   listInbox,
   recommendationDetail,
+  runningJobByItem,
   statusSummary,
 } from "../core/views.js";
 
@@ -235,12 +236,13 @@ export function willDoWindow({
   const lines = willDoLines(opt, bodyWidth);
   const summaryLines = wrapText(detail?.summary ?? "", innerWidth).length;
   const optionsCount = detail?.options?.length ?? 0;
-  // Rows above the WILL DO body, inside the borders(2): title(1), summary plus
-  // its margin(summaryLines+1), the option rows, then the section's marginTop(1)
-  // + separator(1) + header(1).
+  // Rows above the WILL DO body, inside the borders(2): title(1), any in-flight
+  // automation line(1), summary plus its margin(summaryLines+1), the option
+  // rows, then the section's marginTop(1) + separator(1) + header(1).
+  const jobLine = detail?.runningJob ? 1 : 0;
   const viewport = Math.max(
     1,
-    paneHeight - 2 - 1 - (summaryLines + 1) - optionsCount - 3,
+    paneHeight - 2 - 1 - jobLine - (summaryLines + 1) - optionsCount - 3,
   );
   const maxScroll = Math.max(0, lines.length - viewport);
   const start = Math.min(Math.max(0, scroll), maxScroll);
@@ -274,6 +276,10 @@ export function buildInboxModel(
       ? 0
       : Math.min(Math.max(selectedIndex, 0), inbox.length - 1);
 
+  // Open automation per item: a re-triaged item visibly carries its running
+  // fix (row badge + detail line) instead of looking untouched.
+  const runningJobs = runningJobByItem(db);
+
   const items = inbox.map((row, index) => {
     const detail = recommendationDetail(db, row.recommendation_id);
     const options = detail?.options ?? [];
@@ -283,7 +289,10 @@ export function buildInboxModel(
       title: row.title,
       state: row.local_state,
       urgent: row.attention_priority_hint === "urgent",
-      badges: itemBadges(row),
+      badges: [
+        ...itemBadges(row),
+        ...(runningJobs.has(row.item_id) ? ["fix"] : []),
+      ],
       meta: itemMeta(row),
       selected: index === clampedIndex,
       recommendationId: row.recommendation_id,
@@ -307,6 +316,9 @@ export function buildInboxModel(
       detail = {
         summary: d.recommendation.summary ?? "",
         recommendationId: selectedRow.recommendation_id,
+        // The selected item's open automation, shown as an in-flight line so
+        // the user sees a fix is already running before re-approving work.
+        runningJob: runningJobs.get(selectedRow.item_id) ?? null,
         options: d.options.map((opt, index) => ({
           index,
           number: index + 1,
@@ -347,8 +359,27 @@ export function buildInboxModel(
       events: status.events,
       pending: status.pending,
       deadLetter: status.dead_letter,
+      activity: status.activity,
     },
   };
+}
+
+// The header's running-work cluster, e.g. "⚙ 1 triage · 1 fix · 1 awaiting PR".
+// Empty string when nothing is running, so the idle header stays clean. Shared
+// by the Ink header and the plain-string fallback.
+export function activityLabel(activity) {
+  if (!activity) {
+    return "";
+  }
+  const parts = [
+    [activity.triage, "triage"],
+    [activity.fix, "fix"],
+    [activity.awaiting_pr, "awaiting PR"],
+    [activity.action, "action"],
+  ]
+    .filter(([count]) => count > 0)
+    .map(([count, label]) => `${count} ${label}`);
+  return parts.length > 0 ? `⚙ ${parts.join(" · ")}` : "";
 }
 
 // Plain-string fallback used for non-TTY output and tests. It uses the same
@@ -397,8 +428,9 @@ export function renderInboxView(db, opts = {}) {
   );
   lines.push(RULE);
 
+  const running = activityLabel(model.status.activity);
   lines.push(
-    `Status: agent=${model.status.agentTarget}  events=${model.status.events}  pending=${model.status.pending}  dead_letter=${model.status.deadLetter}`,
+    `Status: agent=${model.status.agentTarget}  events=${model.status.events}  pending=${model.status.pending}  dead_letter=${model.status.deadLetter}${running ? `  running: ${running}` : ""}`,
   );
   return lines.join("\n");
 }

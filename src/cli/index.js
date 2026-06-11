@@ -37,7 +37,11 @@ import {
 } from "../core/retention.js";
 import { createLogger } from "../core/log.js";
 import { deadLetterCount, enqueue, pendingCount } from "../core/queue.js";
-import { selectPluginsDueForSync } from "../core/scheduler.js";
+import {
+  prCheckDelayMs,
+  selectJobsDueForPrCheck,
+  selectPluginsDueForSync,
+} from "../core/scheduler.js";
 import {
   pluginConfigure,
   pluginDoctor,
@@ -397,12 +401,33 @@ program
     const byState = db
       .prepare("select local_state, count(*) c from items group by local_state")
       .all();
+    // Fix jobs parked on the PR-probe clock, with the manual fast-path spelled
+    // out so a script (or an impatient human) can recheck immediately.
+    const waitingJobs = db
+      .prepare(
+        `select id, item_id, check_attempts, next_check_at, started_at,
+                metadata_json
+           from jobs
+          where status='running' and phase='waiting_for_pr'
+          order by started_at`,
+      )
+      .all()
+      .map((j) => ({
+        id: j.id,
+        item_id: j.item_id,
+        branch: JSON.parse(j.metadata_json ?? "{}").branch ?? null,
+        waiting_since: j.started_at,
+        check_attempts: j.check_attempts,
+        next_check_at: j.next_check_at,
+        attach_command: `m87 job attach ${j.id}`,
+      }));
     out({
       agent: { target: detection.spec ?? "none", source: detection.source },
       plugins,
       items: Object.fromEntries(byState.map((r) => [r.local_state, r.c])),
       queue: { pending: pendingCount(db), dead_letter: deadLetterCount(db) },
       events: db.prepare("select count(*) c from events").get().c,
+      ...(waitingJobs.length > 0 ? { waiting_jobs: waitingJobs } : {}),
     });
     db.close();
   });
@@ -1411,6 +1436,7 @@ daemon
     if (options.once) {
       writeFileSync(pidPath, String(process.pid));
       await scheduleSync(runtime);
+      schedulePrChecks(runtime);
       await runOnce(runtime);
       runtime.db.close();
       cleanupPid(pidPath);
@@ -1473,6 +1499,10 @@ daemon
             lastSync = Date.now();
             await scheduleSync(runtime);
           }
+          // PR probes run on their own per-job backoff clock (next_check_at),
+          // so the due-check runs every tick - it is one indexed query over a
+          // small table.
+          schedulePrChecks(runtime);
           // The scheduler owns retention sweeps (plan §4). Hourly is plenty:
           // every TTL is measured in days.
           if (Date.now() - lastSweep >= 3_600_000) {
@@ -1517,6 +1547,31 @@ async function scheduleSync(runtime) {
   const plugins = selectPluginsDueForSync(runtime.db, new Date().toISOString());
   for (const p of plugins) {
     runtime.loop.launchEffect({ type: "sync", plugin_id: p.id });
+  }
+}
+
+// Launch a PR probe for every waiting fix job whose backoff window elapsed.
+// The probe's result event re-projects the authoritative schedule; the direct
+// write here is an optimistic claim so a 1s tick cannot double-launch while a
+// probe is still in flight (same category of host scheduling state as
+// plugins.next_retry_at).
+function schedulePrChecks(runtime) {
+  const nowMs = Date.now();
+  const due = selectJobsDueForPrCheck(
+    runtime.db,
+    new Date(nowMs).toISOString(),
+  );
+  const capMs = (runtime.config.poll_interval ?? 300) * 1000;
+  for (const job of due) {
+    runtime.db
+      .prepare("update jobs set next_check_at=? where id=?")
+      .run(
+        new Date(
+          nowMs + prCheckDelayMs(job.check_attempts ?? 0, capMs),
+        ).toISOString(),
+        job.id,
+      );
+    runtime.loop.launchEffect({ type: "fix_detect", job_id: job.id });
   }
 }
 

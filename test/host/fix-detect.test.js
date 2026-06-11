@@ -121,4 +121,58 @@ describe("host/effects fix_detect (FU-15)", () => {
     expect(updated.payload.phase).toBe("waiting_for_pr");
     expect(events.some((e) => e.lifecycle === "closed")).toBe(false);
   });
+
+  it("advances the probe schedule on a miss (attempts + future next_check_at)", async () => {
+    const binaryPath = await writeFakeDetectPlugin(false);
+    await seed(binaryPath);
+    db.prepare(
+      "update jobs set check_attempts=2, started_at='2026-05-28T12:00:00.000Z' where id='job-1'",
+    ).run();
+    const effects = createEffects({
+      db,
+      stateDir: dir,
+      config: { poll_interval: 300 },
+      agentSpec: null,
+    });
+    const { events, api } = collector();
+    await effects.fix_detect({ job_id: "job-1" }, api);
+    const updated = events.find(
+      (e) => e.entity === "job" && e.lifecycle === "updated",
+    );
+    expect(updated.payload.check_attempts).toBe(3);
+    // attempt 3 of the 30s-base backoff = 240s, still under the 300s cap
+    const delta =
+      Date.parse(updated.payload.next_check_at) - Date.now();
+    expect(delta).toBeGreaterThan(200_000);
+    expect(delta).toBeLessThanOrEqual(240_000);
+  });
+
+  it("warns (but never gives up) when a job has waited past the threshold", async () => {
+    const binaryPath = await writeFakeDetectPlugin(false);
+    await seed(binaryPath);
+    const longAgo = new Date(Date.now() - 25 * 3_600_000).toISOString();
+    db.prepare("update jobs set started_at=? where id='job-1'").run(longAgo);
+    const warnings = [];
+    const effects = createEffects({
+      db,
+      stateDir: dir,
+      config: {},
+      agentSpec: null,
+      logger: {
+        info: () => {},
+        warn: (msg, fields) => warnings.push({ msg, fields }),
+        error: () => {},
+      },
+    });
+    const { events, api } = collector();
+    await effects.fix_detect({ job_id: "job-1" }, api);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].fields.waited_hours).toBeGreaterThanOrEqual(24);
+    // Still waiting - no closed event; the probe rotation continues.
+    const updated = events.find(
+      (e) => e.entity === "job" && e.lifecycle === "updated",
+    );
+    expect(updated.payload.phase).toBe("waiting_for_pr");
+    expect(events.some((e) => e.lifecycle === "closed")).toBe(false);
+  });
 });
