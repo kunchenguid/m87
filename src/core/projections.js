@@ -163,6 +163,19 @@ function insertRecommendation(db, e) {
     return;
   }
   const now = e.occurred_at ?? new Date().toISOString();
+  const item = e.item_id
+    ? db
+        .prepare(
+          "select activity_at, content_fingerprint from items where id=?",
+        )
+        .get(e.item_id)
+    : null;
+  const stale = Boolean(
+    item &&
+    ((p.activity_at !== undefined && p.activity_at !== item.activity_at) ||
+      (p.content_fingerprint !== undefined &&
+        p.content_fingerprint !== item.content_fingerprint)),
+  );
   const exists = db
     .prepare("select id from recommendations where id = ?")
     .get(recId);
@@ -170,8 +183,8 @@ function insertRecommendation(db, e) {
     db.prepare(
       `insert into recommendations
         (id, item_id, agent_run_id, source_event_id, summary, evidence_json,
-         activity_at, content_fingerprint, created_at, superseded_at)
-       values (?,?,?,?,?,?,?,?,?,null)`,
+          activity_at, content_fingerprint, created_at, superseded_at)
+       values (?,?,?,?,?,?,?,?,?,?)`,
     ).run(
       recId,
       e.item_id,
@@ -182,6 +195,7 @@ function insertRecommendation(db, e) {
       p.activity_at ?? now,
       p.content_fingerprint ?? "",
       now,
+      stale ? now : null,
     );
     const options = p.options ?? [];
     options.forEach((opt, i) => {
@@ -208,14 +222,18 @@ function insertRecommendation(db, e) {
     // live recommendation (re-triage after new source activity would otherwise
     // leave both live and the inbox would list the item once per rec). Only on
     // first insert, so refolding an old event never supersedes a newer rec.
-    db.prepare(
-      "update recommendations set superseded_at=? where item_id=? and id!=? and superseded_at is null",
-    ).run(now, e.item_id, recId);
+    if (!stale) {
+      db.prepare(
+        "update recommendations set superseded_at=? where item_id=? and id!=? and superseded_at is null",
+      ).run(now, e.item_id, recId);
+    }
   }
   // mark the item as having a live recommendation
-  db.prepare(
-    "update items set local_state='recommended', source_event_id=?, updated_at=? where id=? and local_state in ('new','triaging','snoozed','action_error')",
-  ).run(e.id, now, e.item_id);
+  if (!stale) {
+    db.prepare(
+      "update items set local_state='recommended', source_event_id=?, updated_at=? where id=? and local_state in ('new','triaging','snoozed','action_error')",
+    ).run(e.id, now, e.item_id);
+  }
 }
 
 function closeRecommendation(db, e) {
