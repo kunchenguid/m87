@@ -1,10 +1,20 @@
+/* global process */
+
 import { execFile, execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
-import { gracefulStopDaemon, isAlive } from "../../../../src/cli/daemon-lifecycle.js";
+import {
+  gracefulStopDaemon,
+  isAlive,
+} from "../../../../src/cli/daemon-lifecycle.js";
 import { getServiceLabel } from "../../../../src/cli/service.js";
 import { readManifest } from "../../../../src/host/plugin.js";
 import { killChild } from "../../../../test/support/e2e-harness.js";
@@ -38,7 +48,11 @@ async function withStateDir(fn) {
 }
 
 function startIdleProcess(args = []) {
-  return execFile(process.execPath, ["-e", "setInterval(() => {}, 1000)", ...args]);
+  return execFile(process.execPath, [
+    "-e",
+    "setInterval(() => {}, 1000)",
+    ...args,
+  ]);
 }
 
 await withStateDir(async (stateDir) => {
@@ -49,7 +63,10 @@ await withStateDir(async (stateDir) => {
     const result = await gracefulStopDaemon();
     const stillAlive = isAlive(child.pid);
     const pidfileExists = existsSync(join(stateDir, "daemon.pid"));
-    assert(result.status === "not_running", "non-daemon pid should be treated as not_running");
+    assert(
+      result.status === "not_running",
+      "non-daemon pid should be treated as not_running",
+    );
     assert(stillAlive, "non-daemon process should not be killed");
     assert(!pidfileExists, "mismatched stale pidfile should be removed");
     record("stale pid owned by unrelated process", {
@@ -65,7 +82,12 @@ await withStateDir(async (stateDir) => {
 });
 
 await withStateDir(async (stateDir) => {
-  const child = startIdleProcess(["daemon", "run", "--state-token", getServiceLabel(stateDir)]);
+  const child = startIdleProcess([
+    "daemon",
+    "run",
+    "--state-token",
+    getServiceLabel(stateDir),
+  ]);
   writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
 
   const result = await gracefulStopDaemon();
@@ -96,7 +118,8 @@ try {
     status: "passed",
     pid: exitedChild.pid,
     taskkillInvoked: false,
-    behavior: "returned before raw-pid taskkill because exitCode was already observed",
+    behavior:
+      "returned before raw-pid taskkill because exitCode was already observed",
   });
 } finally {
   Object.defineProperty(process, "platform", originalPlatform);
