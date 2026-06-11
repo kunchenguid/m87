@@ -68,7 +68,7 @@ export async function installBundledPlugin({
 
 /**
  * @param {object} plan
- * @param {{ bundledPluginPaths: Record<string, string>, cliEntry: string, confirmDaemonPid?: (pid: number) => boolean | Promise<boolean> }} deps
+ * @param {{ bundledPluginPaths: Record<string, string>, cliEntry: string, confirmDaemonPid?: (pid: number) => import("../cli/daemon-lifecycle.js").DaemonPidIdentity | boolean | Promise<import("../cli/daemon-lifecycle.js").DaemonPidIdentity | boolean> }} deps
  */
 export async function applyInitPlan(
   plan,

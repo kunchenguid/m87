@@ -168,7 +168,7 @@ export function startDetachedDaemon(cliEntry) {
 // gracefully stopped first and the service owns the process from then on.
 /**
  * @param {string} cliEntry
- * @param {{ confirmDaemonPid?: (pid: number) => boolean | Promise<boolean> }} [options]
+ * @param {{ confirmDaemonPid?: (pid: number) => DaemonPidIdentity | boolean | Promise<DaemonPidIdentity | boolean> }} [options]
  */
 export async function installManagedService(
   cliEntry,
