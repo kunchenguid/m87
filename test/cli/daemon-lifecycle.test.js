@@ -106,4 +106,19 @@ describe("cli/daemon-lifecycle signal fallback identity check", () => {
     expect(result).toMatchObject({ status: "stopped", pid: child.pid });
     expect(isAlive(child.pid)).toBe(false);
   });
+
+  it("stops a legacy daemon process without a state token", async () => {
+    child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+
+    const result = await gracefulStopDaemon();
+
+    expect(result).toMatchObject({ status: "stopped", pid: child.pid });
+    expect(isAlive(child.pid)).toBe(false);
+  });
 });

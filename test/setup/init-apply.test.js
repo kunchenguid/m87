@@ -92,6 +92,16 @@ describe("init apply daemon lifecycle", () => {
     expect(spawn).not.toHaveBeenCalled();
   });
 
+  it("does not spawn another daemon when a live legacy pid is recorded", () => {
+    writeFileSync(join(stateDir, "daemon.pid"), String(process.pid));
+    execFileSync.mockReturnValue(`node ${cliEntry} daemon run`);
+
+    const result = startDetachedDaemon(cliEntry);
+
+    expect(result).toEqual({ status: "already_running", pid: process.pid });
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it("starts a daemon when the live pidfile is not a daemon", () => {
     const pidPath = join(stateDir, "daemon.pid");
     writeFileSync(pidPath, String(process.pid));

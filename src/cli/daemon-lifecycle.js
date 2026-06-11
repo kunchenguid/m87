@@ -74,11 +74,9 @@ function daemonPidIdentity(pid) {
             timeout: 10000,
           });
     const commandText = String(command ?? "");
-    return /\bdaemon\s+run\b/.test(commandText) &&
-      commandText.includes("--state-token") &&
-      commandText.includes(token)
-      ? "match"
-      : "mismatch";
+    if (!/\bdaemon\s+run\b/.test(commandText)) return "mismatch";
+    if (!commandText.includes("--state-token")) return "match";
+    return commandText.includes(token) ? "match" : "mismatch";
   } catch {
     return "unknown";
   }
