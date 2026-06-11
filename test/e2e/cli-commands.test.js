@@ -200,10 +200,15 @@ describe("e2e: restored CLI commands (under a daemon)", () => {
     expect(imported.plugins).toBe(1);
   });
 
-  it("daemon status reports the running daemon", async () => {
+  it("daemon status reports the running daemon and its version", async () => {
     const status = parse(await m87("daemon", "status"));
+    expect(status.status).toBe("running");
     expect(status.running).toBe(true);
     expect(typeof status.pid).toBe("number");
+    // The daemon answers ping with the version it loaded at startup; here it
+    // runs the same source tree as the CLI, so the two must match.
+    expect(status.version).toBe(pkg.version);
+    expect(status.cli_version).toBe(pkg.version);
   });
 
   it("daemon install/uninstall manage a service unit (dry run)", async () => {
