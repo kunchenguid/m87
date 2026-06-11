@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { gracefulStopDaemon, isAlive } from "../../src/cli/daemon-lifecycle.js";
+import { getServiceLabel } from "../../src/cli/service.js";
 
 // The signal fallback in gracefulStopDaemon acts on a pid read from the pid
 // file. That pid can be stale - the daemon died and the OS recycled the pid
@@ -51,14 +52,31 @@ describe("cli/daemon-lifecycle signal fallback identity check", () => {
     expect(isAlive(child.pid)).toBe(true);
   });
 
-  it("stops a verified daemon process via the signal fallback", async () => {
-    // Extra argv after the -e script makes the command line read `... daemon
-    // run`, which is exactly what the identity probe looks for.
+  it("refuses to signal a daemon for a different state dir", async () => {
     child = execFile(process.execPath, [
       "-e",
       "setInterval(() => {}, 1000)",
       "daemon",
       "run",
+      "--state-token",
+      getServiceLabel(join(homeDir, "other-m87")),
+    ]);
+    writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
+
+    const result = await gracefulStopDaemon();
+
+    expect(result).toEqual({ status: "not_running" });
+    expect(isAlive(child.pid)).toBe(true);
+  });
+
+  it("stops a verified daemon process via the signal fallback", async () => {
+    child = execFile(process.execPath, [
+      "-e",
+      "setInterval(() => {}, 1000)",
+      "daemon",
+      "run",
+      "--state-token",
+      getServiceLabel(stateDir),
     ]);
     writeFileSync(join(stateDir, "daemon.pid"), String(child.pid));
 

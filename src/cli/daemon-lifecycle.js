@@ -10,7 +10,12 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { sendControl } from "../core/control.js";
-import { getServicePlan, isServiceDryRun } from "./service.js";
+import {
+  getDaemonInvocationArgs,
+  getServiceLabel,
+  getServicePlan,
+  isServiceDryRun,
+} from "./service.js";
 import { getStatePaths } from "./state.js";
 
 // Daemon process lifecycle shared by the CLI commands and the setup flow, so
@@ -42,6 +47,8 @@ export function runningDaemonPid() {
 // process's command line has to look like `... daemon run` first.
 function pidLooksLikeDaemon(pid) {
   try {
+    const { stateDir } = getStatePaths();
+    const token = getServiceLabel(stateDir);
     const command =
       process.platform === "win32"
         ? execFileSync(
@@ -57,7 +64,12 @@ function pidLooksLikeDaemon(pid) {
             encoding: "utf8",
             timeout: 10000,
           });
-    return /\bdaemon\s+run\b/.test(String(command ?? ""));
+    const commandText = String(command ?? "");
+    return (
+      /\bdaemon\s+run\b/.test(commandText) &&
+      commandText.includes("--state-token") &&
+      commandText.includes(token)
+    );
   } catch {
     return false;
   }
@@ -99,18 +111,22 @@ export async function gracefulStopDaemon({
 // every start path must wire the log file or operational events are lost.
 // No-op when a daemon is already running.
 export function startDetachedDaemon(cliEntry) {
-  const { logPath } = getStatePaths();
+  const { logPath, stateDir } = getStatePaths();
   const pid = runningDaemonPid();
   if (pid !== null) return { status: "already_running", pid };
   mkdirSync(dirname(logPath), { recursive: true });
   const logFd = openSync(logPath, "a");
   let child;
   try {
-    child = spawn(process.execPath, [cliEntry, "daemon", "run"], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: process.env,
-    });
+    child = spawn(
+      process.execPath,
+      getDaemonInvocationArgs(stateDir, cliEntry),
+      {
+        detached: true,
+        stdio: ["ignore", logFd, logFd],
+        env: process.env,
+      },
+    );
   } finally {
     closeSync(logFd);
   }

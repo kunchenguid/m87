@@ -32,7 +32,8 @@ const { installManagedService, startDetachedDaemon } =
   await import("../../src/cli/daemon-lifecycle.js");
 const { buildInitApplyPlan, defaultInitSelections } =
   await import("../../src/setup/init-model.js");
-const { getServicePlan } = await import("../../src/cli/service.js");
+const { getDaemonInvocationArgs, getServicePlan } =
+  await import("../../src/cli/service.js");
 
 describe("init apply daemon lifecycle", () => {
   let homeDir;
@@ -143,7 +144,7 @@ describe("init apply daemon lifecycle", () => {
       expect(existsSync(servicePlan.unitPath)).toBe(false);
       expect(spawn).toHaveBeenCalledWith(
         process.execPath,
-        [cliEntry, "daemon", "run"],
+        getDaemonInvocationArgs(stateDir, cliEntry),
         expect.objectContaining({ detached: true }),
       );
     } finally {
@@ -203,7 +204,7 @@ describe("init apply daemon lifecycle", () => {
       expect(existsSync(servicePlan.unitPath)).toBe(false);
       expect(spawn).toHaveBeenCalledWith(
         process.execPath,
-        [cliEntry, "daemon", "run"],
+        getDaemonInvocationArgs(stateDir, cliEntry),
         expect.objectContaining({ detached: true }),
       );
     } finally {
