@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/kunchenguid/m87/compare/m87-v0.1.6...m87-v0.1.7) (2026-06-11)
+
+
+### Bug Fixes
+
+* **cli:** avoid killing recycled daemon and child pids ([#24](https://github.com/kunchenguid/m87/issues/24)) ([f0acaed](https://github.com/kunchenguid/m87/commit/f0acaedb913638aab0ad7806fc71c165b5b86dc2))
+
 ## [0.1.6](https://github.com/kunchenguid/m87/compare/m87-v0.1.5...m87-v0.1.6) (2026-06-11)
 
 

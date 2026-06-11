@@ -1,6 +1,6 @@
 {
   "name": "@kunchenguid/m87",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": false,
   "type": "module",
   "description": "Local-first review queue (event-driven)",
