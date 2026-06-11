@@ -115,6 +115,35 @@ describe("core/projections", () => {
     ).toBe("recommended");
   });
 
+  it("a newer recommendation supersedes the previous live one for the same item", () => {
+    project(db, itemCreated());
+    const rec = (id) =>
+      makeEvent({
+        actor: "agent",
+        entity: "recommendation",
+        lifecycle: "created",
+        item_id: ITEM,
+        payload: {
+          type: "triage_result",
+          recommendation_id: id,
+          summary: "s",
+          options: [{ title: "o" }],
+        },
+      });
+    const first = rec("rec-1");
+    project(db, first);
+    project(db, rec("rec-2"));
+    const liveIds = () =>
+      db
+        .prepare("select id from recommendations where superseded_at is null")
+        .all()
+        .map((r) => r.id);
+    expect(liveIds()).toEqual(["rec-2"]);
+    // Refolding the older event (replay) must not supersede the newer rec.
+    project(db, first);
+    expect(liveIds()).toEqual(["rec-2"]);
+  });
+
   it("approval.created writes a write-once approval and supersedes the rec", () => {
     project(db, itemCreated());
     project(

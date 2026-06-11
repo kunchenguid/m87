@@ -175,7 +175,10 @@ function InboxPane({ model, width, height }) {
           ),
         ]
       : visible.map((row) =>
-          h(ItemRow, { key: row.itemId, row, width: innerWidth }),
+          // Keyed by recommendation id, not item id: recommendation ids are
+          // unique per row by schema, so two rows can never share a key (which
+          // corrupts Ink's keyed repaint and leaves ghost lines on screen).
+          h(ItemRow, { key: row.recommendationId, row, width: innerWidth }),
         );
 
   const moreAbove = start > 0;

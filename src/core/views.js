@@ -3,6 +3,9 @@
 // queries read the materialized entity tables.
 
 export function listInbox(db, now = new Date().toISOString()) {
+  // The projection enforces one live recommendation per item; the newest-rec
+  // subquery is a defensive dedup so historical state folded before that rule
+  // can never render an item once per live rec.
   return db
     .prepare(
       `select r.id as recommendation_id, r.summary, i.id as item_id, i.title, i.url,
@@ -11,6 +14,9 @@ export function listInbox(db, now = new Date().toISOString()) {
               i.waiting_on, i.metadata_json
          from recommendations r join items i on i.id = r.item_id
         where r.superseded_at is null
+          and r.id = (select r2.id from recommendations r2
+                       where r2.item_id = r.item_id and r2.superseded_at is null
+                       order by r2.created_at desc, r2.rowid desc limit 1)
           and (i.local_state in ('recommended','action_error')
                or (i.local_state='snoozed' and i.snoozed_until <= ?))
         order by case i.attention_priority_hint when 'urgent' then 0 else 1 end,

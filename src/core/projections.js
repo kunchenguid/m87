@@ -204,6 +204,13 @@ function insertRecommendation(db, e) {
         now,
       );
     });
+    // One live recommendation per item: a fresh triage supersedes any earlier
+    // live recommendation (re-triage after new source activity would otherwise
+    // leave both live and the inbox would list the item once per rec). Only on
+    // first insert, so refolding an old event never supersedes a newer rec.
+    db.prepare(
+      "update recommendations set superseded_at=? where item_id=? and id!=? and superseded_at is null",
+    ).run(now, e.item_id, recId);
   }
   // mark the item as having a live recommendation
   db.prepare(
