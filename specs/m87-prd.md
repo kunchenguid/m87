@@ -168,7 +168,10 @@ m87 plugin sync <plugin>
 m87 plugin list
 m87 plugin doctor
 m87 daemon start
+m87 daemon status       # includes stale daemon detection
+m87 daemon restart
 m87 daemon stop
+m87 update --check
 ```
 
 ## Product Model
@@ -217,7 +220,7 @@ Responsibilities:
 | Persist user approvals and edits.                                                                  | Preview action effects where possible.                      |
 | Invoke plugin action validation, preview, and execution.                                           | Execute approved actions.                                   |
 | Maintain audit trail.                                                                              | Return stable source URLs for native clients.               |
-| Emit daemon status and live UI events over IPC.                                                    |                                                             |
+| Emit daemon status, upgrade restarts, and live UI events over IPC.                                 |                                                             |
 
 ## Tech Stack
 

@@ -21,6 +21,8 @@ m87 --version
 m87 status
 ```
 
+After a release is installed, `m87 update --check` only reports whether a newer npm release exists, while `m87 update` installs it and restarts any running daemon onto the new code.
+
 For local development before publishing, use the repository scripts instead:
 
 ```sh
@@ -192,7 +194,7 @@ Detached and managed daemons write operational logs to `~/.m87/daemon.log`, whic
 Installing the managed service stops any session daemon first, then lets the service own the background process so only one daemon works on the local state.
 If a daemon restart cannot stop the old process within its stop window, the command fails with `stop_failed` instead of starting another daemon.
 A daemon keeps running the code it loaded at startup, so it watches the installed `package.json` and restarts itself (draining in-flight work first) when an upgrade lands on disk - regardless of which package manager performed it.
-`m87 update` restarts the daemon immediately after installing, and `m87 daemon status` reports `running_stale` during the window where the daemon and CLI versions still diverge.
+`m87 update` restarts the daemon immediately after installing, `m87 update --check` never changes it, and `m87 daemon status` reports `running_stale` during the window where the daemon and CLI versions still diverge.
 Failed GitHub syncs are retried with backoff, so a transient `gh` auth or network failure should recover after credentials or connectivity return.
 Use `--github-owned` to sync source repositories for `--github-username`, or `--github-authored-external` to sync recently updated issues and PRs authored by that user outside explicitly configured repositories.
 GitHub approvals can create real comments, reviews, close/reopen state changes, and other source-visible effects declared by the plugin action catalog.

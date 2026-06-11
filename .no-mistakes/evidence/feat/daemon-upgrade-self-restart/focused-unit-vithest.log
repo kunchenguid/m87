@@ -1,0 +1,27 @@
+
+ RUN  v4.1.5 /Users/kunchen/.no-mistakes/worktrees/65a99c59c7f2/01KTW16PAMVRAKCRCYAFJY4ZJB
+
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > findInstalledPackageJson > walks up past unrelated package.json files to the matching one 2ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > findInstalledPackageJson > returns null when no matching package.json exists 1ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > readPackageVersion > reads the version for the matching package 0ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > readPackageVersion > returns null for a missing, half-written, or foreign file 1ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > createUpgradeWatcher > confirms an upgrade only on two consecutive matching probes 1ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > createUpgradeWatcher > probes at most once per interval 1ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > createUpgradeWatcher > resets when the version settles back to the running one 1ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > createUpgradeWatcher > treats an unreadable probe as no change 1ms
+ ✓ test/cli/upgrade-watch.test.js > cli/upgrade-watch > createUpgradeWatcher > reports a null probe path when the package cannot be located 0ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle signal fallback identity check > refuses to signal a live process that is not a daemon 9ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle signal fallback identity check > refuses to signal a daemon for a different state dir 4ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle signal fallback identity check > leaves the pidfile when daemon identity is unknown 1ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle signal fallback identity check > stops a verified daemon process via the signal fallback 105ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle signal fallback identity check > stops a legacy daemon process without a state token 105ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle restartDaemon with a managed service > restarts through the service manager when a unit exists 1ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle restartDaemon with a managed service > does not reactivate a service when the old daemon is still stopping 8179ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle restartDaemon with a managed service > reports no managed service when no unit exists 5ms
+ ✓ test/cli/daemon-lifecycle.test.js > cli/daemon-lifecycle restartDaemon with a managed service > starts a detached daemon for schtasks units 13ms
+
+ Test Files  2 passed (2)
+      Tests  18 passed (18)
+   Start at  12:21:29
+   Duration  8.53s (transform 24ms, setup 0ms, import 41ms, tests 8.43s, environment 0ms)
+

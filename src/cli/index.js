@@ -139,8 +139,8 @@ async function pollFor(
 }
 
 // Ask the running daemon to sync immediately over the control channel. Returns
-// false if the daemon can't be reached (then the caller falls back to a short
-// poll, since the daemon syncs on its own tick regardless).
+// whether the daemon accepted the request, plus an error when it deliberately
+// rejects new work while draining for an upgrade restart.
 async function requestDaemonSync() {
   try {
     const reply = await sendControl(
