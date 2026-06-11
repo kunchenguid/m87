@@ -213,6 +213,9 @@ describe("tui/InboxView", () => {
           itemId: "mock:2",
           title: "an urgent item",
           urgent: true,
+          // distinct per row, as the inbox schema guarantees (rows are keyed
+          // by recommendation id)
+          recommendationId: "rec-2",
         }),
       ],
       detail: null,

@@ -40,10 +40,15 @@ describe("init apply daemon lifecycle", () => {
   let savedEnv;
 
   const cliEntry = "m87-cli.js";
+  // The daemons these tests stand in (disposable `node -e` children, mocked
+  // pids) don't have real `daemon run` command lines, so the recycled-pid
+  // identity check is satisfied explicitly.
+  const confirmDaemonPid = () => true;
   const apply = (selections, context = {}) =>
     applyInitPlan(buildInitApplyPlan(selections, context), {
       bundledPluginPaths: {},
       cliEntry,
+      confirmDaemonPid,
     });
 
   beforeEach(() => {
@@ -121,7 +126,9 @@ describe("init apply daemon lifecycle", () => {
     });
 
     try {
-      const result = await installManagedService(cliEntry);
+      const result = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(result).toMatchObject({
         status: "activation_failed",
@@ -158,7 +165,9 @@ describe("init apply daemon lifecycle", () => {
     writeFileSync(join(stateDir, "daemon.pid"), String(firstChild.pid));
 
     try {
-      const firstResult = await installManagedService(cliEntry);
+      const firstResult = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(firstResult).toMatchObject({
         status: "activation_failed",
@@ -181,7 +190,9 @@ describe("init apply daemon lifecycle", () => {
     writeFileSync(join(stateDir, "daemon.pid"), String(retryChild.pid));
 
     try {
-      const retryResult = await installManagedService(cliEntry);
+      const retryResult = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(retryResult).toMatchObject({
         status: "activation_failed",
@@ -217,7 +228,9 @@ describe("init apply daemon lifecycle", () => {
     });
 
     try {
-      const result = await installManagedService(cliEntry);
+      const result = await installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
 
       expect(result).toMatchObject({
         status: "activation_failed",
@@ -242,7 +255,7 @@ describe("init apply daemon lifecycle", () => {
       throw new Error("activate failed");
     });
 
-    const result = await installManagedService(cliEntry);
+    const result = await installManagedService(cliEntry, { confirmDaemonPid });
 
     expect(result.status).toBe("installed");
     expect(result.activation).toBe("write_only_activation_failed");
@@ -292,7 +305,9 @@ describe("init apply daemon lifecycle", () => {
     vi.useFakeTimers();
 
     try {
-      const resultPromise = installManagedService(cliEntry);
+      const resultPromise = installManagedService(cliEntry, {
+        confirmDaemonPid,
+      });
       await vi.runAllTimersAsync();
       const result = await resultPromise;
 

@@ -43,6 +43,13 @@ function trackChild(child) {
 /** Kill a child's whole process group (CLI parent + plugin grandchildren). */
 export function killChild(child, signal = "SIGKILL") {
   if (!child || child.pid === undefined) return;
+  // Once Node has observed the exit, the OS may recycle the pid at any moment,
+  // so the raw-pid kills below (taskkill, negative-pgid) could hit an unrelated
+  // freshly spawned process - seen as rare cross-worker plugin kills on Windows
+  // CI. While exitCode/signalCode are still null the pid stays pinned (open
+  // process handle on Windows, zombie entry on POSIX), so killing by pid is
+  // race-free; after that, there is nothing left to kill.
+  if (child.exitCode != null || child.signalCode != null) return;
   if (process.platform === "win32") {
     try {
       execFileSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {

@@ -35,9 +35,43 @@ export function runningDaemonPid() {
   return Number.isInteger(pid) && pid > 0 && isAlive(pid) ? pid : null;
 }
 
+// A stale pid file can record a pid the OS has since recycled into an
+// unrelated process, and isAlive() cannot tell the two apart. The signal
+// fallback in gracefulStopDaemon must never fire on such a pid - on Windows
+// the emulated SIGTERM is an unconditional TerminateProcess - so the live
+// process's command line has to look like `... daemon run` first.
+function pidLooksLikeDaemon(pid) {
+  try {
+    const command =
+      process.platform === "win32"
+        ? execFileSync(
+            "powershell.exe",
+            [
+              "-NoProfile",
+              "-Command",
+              `(Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}').CommandLine`,
+            ],
+            { encoding: "utf8", timeout: 10000 },
+          )
+        : execFileSync("ps", ["-o", "command=", "-p", String(pid)], {
+            encoding: "utf8",
+            timeout: 10000,
+          });
+    return /\bdaemon\s+run\b/.test(String(command ?? ""));
+  } catch {
+    return false;
+  }
+}
+
 // Graceful, cross-platform daemon stop: ask over the control channel first,
 // fall back to a signal (forcible on Windows), then wait briefly for exit.
-export async function gracefulStopDaemon() {
+// `confirmDaemonPid` exists for tests that stand in fake daemons.
+/**
+ * @param {{ confirmDaemonPid?: (pid: number) => boolean | Promise<boolean> }} [options]
+ */
+export async function gracefulStopDaemon({
+  confirmDaemonPid = pidLooksLikeDaemon,
+} = {}) {
   const { controlAddress } = getStatePaths();
   const pid = runningDaemonPid();
   if (pid === null) return { status: "not_running" };
@@ -45,7 +79,9 @@ export async function gracefulStopDaemon() {
     await sendControl(controlAddress, { cmd: "stop" }, { timeoutMs: 3000 });
   } catch {
     // Control channel unreachable (e.g. a pre-socket daemon): fall back to a
-    // signal.
+    // signal, but only onto a verified daemon process - never a pid the OS
+    // recycled into something else.
+    if (!(await confirmDaemonPid(pid))) return { status: "not_running" };
     try {
       process.kill(pid, "SIGTERM");
     } catch {
@@ -87,7 +123,14 @@ export function startDetachedDaemon(cliEntry) {
 // (the newcomer silently hijacks both, orphaning the older process while the
 // service manager keeps its own instance alive), so any running daemon is
 // gracefully stopped first and the service owns the process from then on.
-export async function installManagedService(cliEntry) {
+/**
+ * @param {string} cliEntry
+ * @param {{ confirmDaemonPid?: (pid: number) => boolean | Promise<boolean> }} [options]
+ */
+export async function installManagedService(
+  cliEntry,
+  { confirmDaemonPid } = {},
+) {
   const { stateDir } = getStatePaths();
   const plan = getServicePlan(stateDir, cliEntry);
   if (!plan) {
@@ -95,7 +138,9 @@ export async function installManagedService(cliEntry) {
   }
   const unitExistedBeforeInstall = existsSync(plan.unitPath);
   const stopped =
-    runningDaemonPid() !== null ? await gracefulStopDaemon() : null;
+    runningDaemonPid() !== null
+      ? await gracefulStopDaemon({ confirmDaemonPid })
+      : null;
   if (stopped?.status === "stopping") {
     return {
       status: "stop_failed",

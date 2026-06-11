@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -97,5 +100,21 @@ describe("host/plugin (real mock subprocess, contract v2)", () => {
     });
     expect(sub.status).toBe("submitted");
     expect(sub.pr_url).toContain("mock://pull/");
+  });
+
+  // A plugin process that dies without writing stderr (e.g. terminated from
+  // outside) must still produce a diagnosable error naming the exit cause.
+  it("names the exit cause when a plugin dies without stderr", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "m87-plugin-test-"));
+    const bin = join(dir, "dies-silently.js");
+    await writeFile(bin, "process.exit(7);\n");
+
+    try {
+      await expect(readManifest(bin)).rejects.toThrow(
+        "plugin manifest exited with code 7",
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
