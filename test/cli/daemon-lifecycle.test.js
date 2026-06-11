@@ -134,10 +134,13 @@ describe("cli/daemon-lifecycle signal fallback identity check", () => {
 describe("cli/daemon-lifecycle restartDaemon with a managed service", () => {
   let homeDir;
   let stateDir;
+  let savedPlatform;
   const savedEnv = {};
   const cliEntry = join("fake", "cli.js");
 
   beforeEach(() => {
+    savedPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "linux" });
     homeDir = mkdtempSync(join(tmpdir(), "m87-restart-"));
     stateDir = join(homeDir, ".m87");
     mkdirSync(stateDir, { recursive: true });
@@ -158,6 +161,7 @@ describe("cli/daemon-lifecycle restartDaemon with a managed service", () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process, "platform", savedPlatform);
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) {
         delete process.env[key];
@@ -205,7 +209,9 @@ describe("cli/daemon-lifecycle restartDaemon with a managed service", () => {
       for (let i = 0; i < 50 && !existsSync(readyPath); i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
-      const result = await restartDaemon(cliEntry);
+      const result = await restartDaemon(cliEntry, {
+        confirmDaemonPid: () => "match",
+      });
 
       expect(result).toEqual({
         status: "stop_failed",
