@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/kunchenguid/m87/compare/m87-v0.1.7...m87-v0.1.8) (2026-06-11)
+
+
+### Bug Fixes
+
+* surface waiting PR jobs and automation state ([#26](https://github.com/kunchenguid/m87/issues/26)) ([9a7f64b](https://github.com/kunchenguid/m87/commit/9a7f64b1779ced13a1cfce1b626497943e5887b4))
+
 ## [0.1.7](https://github.com/kunchenguid/m87/compare/m87-v0.1.6...m87-v0.1.7) (2026-06-11)
 
 
