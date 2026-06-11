@@ -1,0 +1,23 @@
+agent:
+  target: acp:claude
+  source: auto
+plugins:
+  - id: github
+    status: active
+    last_sync_at: null
+    last_error: null
+items:
+  recommended: 1
+  snoozed: 1
+queue:
+  pending: 0
+  dead_letter: 0
+events: 0
+waiting_jobs:
+  - id: job-1
+    item_id: github:issue:o/r/69
+    branch: m87/fix-job-1
+    waiting_since: '2026-06-11T10:02:00.000Z'
+    check_attempts: 4
+    next_check_at: '2026-06-11T10:11:00.000Z'
+    attach_command: m87 job attach job-1

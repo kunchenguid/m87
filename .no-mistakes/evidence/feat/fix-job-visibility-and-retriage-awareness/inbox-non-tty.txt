@@ -1,0 +1,11 @@
+M87 Inbox  (1 item)
+------------------------------------------------------------
+> [0] github:issue:o/r/69  Approved fix went invisible [urgent]  [fix]  o/r · issue #69 · 7h  (recommended)
+------------------------------------------------------------
+Detail: New activity arrived while an approved fix is already running; wait for that automation instead of duplicating it.
+  (0) Wait for existing fix  [high]
+  rec: rec-1
+------------------------------------------------------------
+Actions: ↑/↓ move · a approve · d dismiss · s snooze · r refresh · q quit
+------------------------------------------------------------
+Status: agent=acp:claude  events=0  pending=0  dead_letter=0  running: ⚙ 1 triage · 1 fix · 1 awaiting PR · 1 action
