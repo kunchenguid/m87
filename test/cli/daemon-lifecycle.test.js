@@ -189,4 +189,27 @@ describe("cli/daemon-lifecycle restartDaemon with a managed service", () => {
   it("reports no managed service when no unit exists", () => {
     expect(managedServiceExists(cliEntry)).toBe(false);
   });
+
+  it("starts a detached daemon for schtasks units", async () => {
+    const savedPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      const plan = getServicePlan(stateDir, cliEntry);
+      mkdirSync(dirname(plan.unitPath), { recursive: true });
+      writeFileSync(plan.unitPath, plan.content);
+      expect(managedServiceExists(cliEntry)).toBe(true);
+
+      const result = await restartDaemon(cliEntry);
+
+      expect(result).toMatchObject({
+        status: "restarted",
+        stopped: null,
+      });
+      expect(result).not.toHaveProperty("manager");
+      expect(result).not.toHaveProperty("unit");
+      expect(result.pid).toEqual(expect.any(Number));
+    } finally {
+      Object.defineProperty(process, "platform", savedPlatform);
+    }
+  });
 });

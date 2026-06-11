@@ -183,7 +183,7 @@ export function managedServiceExists(cliEntry) {
 export async function restartDaemon(cliEntry, { confirmDaemonPid } = {}) {
   const { stateDir } = getStatePaths();
   const plan = getServicePlan(stateDir, cliEntry);
-  if (plan !== null && existsSync(plan.unitPath)) {
+  if (plan !== null && plan.manager !== "schtasks" && existsSync(plan.unitPath)) {
     if (!isServiceDryRun()) {
       try {
         execFileSync(plan.deactivate.command, plan.deactivate.args, {
