@@ -132,6 +132,8 @@ It owns sync, triage, action execution, and automation jobs - the CLI and TUI ju
 - **Agent is ACP-pluggable** - `m87` auto-detects an installed provider CLI (`claude`, then `codex`, then `opencode`) as its `acp:` target, or you set one explicitly in config.
 - **Automation jobs stay reviewable** - approving a fix option queues a coding-agent job that the daemon runs into a draft pull request.
   It never merges for you.
+  When the PR opens asynchronously (the no-mistakes path), the daemon re-probes for it on a capped backoff until it appears, so the job settles without a manual `m87 job attach`.
+- **Triage sees running automation** - a re-triage receives the item's open jobs, executed actions, and prior approval as `local_automation_state`, so it recommends waiting for or building on in-flight work instead of duplicating it.
 
 ## CLI Reference
 

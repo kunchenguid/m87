@@ -138,7 +138,8 @@ After more plugins exist, the queue can contain rows like:
   reply · 4h
 ```
 
-The detail pane shows normalized item metadata, plugin-rendered source context, agent rationale grounded in visible context, ordered recommendation options, proposed actions, action preview and safety warnings, token usage and model, and plugin execution status.
+The detail pane shows normalized item metadata, plugin-rendered source context, agent rationale grounded in visible context, ordered recommendation options, proposed actions, action preview and safety warnings, token usage and model, plugin execution status, and any open automation for the selected item.
+Inbox rows with open automation carry a `fix` badge so re-triaged items do not look untouched.
 
 Core actions:
 
@@ -381,10 +382,12 @@ Prompt sections:
 - Plugin source context: item metadata, thread text, related objects, and source-specific caveats.
 - Evidence catalog: stable IDs for events, snippets, attachments, URLs, and related objects that options can cite.
 - Plugin action catalog: action types, descriptions, JSON schemas, and examples.
+- Local automation state: open jobs, recent completed jobs, recent executed actions, and the latest approval for the item.
 - Rerun instructions: user-provided private context for this run.
 
 The prompt recommends one to three options when there are real alternatives, but the agent should choose however many next steps fit the situation.
 It asks the agent to ground rationale in visible source context and prefers no remote action when confidence is low.
+When local automation state is present, it instructs the agent not to duplicate work that is already running or recently completed.
 
 ## Agent Runtime
 
@@ -463,7 +466,8 @@ Daemon cycle:
 10. Run the agent.
 11. Validate recommendation and plugin action payloads.
 12. Insert recommendation and supersede older active recommendation.
-13. Emit IPC updates for the UI.
+13. Re-probe due fix jobs that are waiting for delayed PR creation.
+14. Emit IPC updates for the UI.
 
 The core avoids source-specific deep probes.
 Sources needing hidden-activity detection implement it inside `sync` or later expose a plugin-specific `refresh` capability.
@@ -537,7 +541,7 @@ The exact schema can evolve, but the core tables should conceptually include:
 | `approvals`              | `id`, `recommendation_id`, `option_id`, `item_id`, `source_event_id`, `decision`, `edited_actions_json`, `idempotency_key`, `created_at`                                                                                                                                                                                                                                           |
 | `action_results`         | `id`, `approval_id`, `item_id`, `plugin_id`, `action_id`, `action_type`, `required`, `depends_on_json`, `safety`, `status`, `validation_json`, `preview_json`, `request_json`, `result_json`, `error`, `source_event_id`, `started_at`, `completed_at`                                                                                                                             |
 | `action_previews`        | `id`, `recommendation_id`, `option_id`, `item_id`, `plugin_id`, `action_id`, `action_type`, `required`, `depends_on_json`, `safety`, `validation_json`, `preview_json`, `request_json`, `edited_actions_json`, `created_at`                                                                                                                                                        |
-| `jobs`                   | `id`, `item_id`, `recommendation_id`, `option_id`, `approval_id`, `kind`, `status`, `phase`, `prompt`, `metadata_json`, `error`, `source_event_id`, `created_at`, `started_at`, `updated_at`, `completed_at`                                                                                                                                                                       |
+| `jobs`                   | `id`, `item_id`, `recommendation_id`, `option_id`, `approval_id`, `kind`, `status`, `phase`, `prompt`, `metadata_json`, `error`, `source_event_id`, `check_attempts`, `next_check_at`, `created_at`, `started_at`, `updated_at`, `completed_at`                                                                                                                                    |
 | `retention_policies`     | `id`, `scope`, `raw_context_ttl`, `prompt_ttl`, `draft_ttl`, `attachment_ttl`, `audit_ttl`, `created_at`, `updated_at`                                                                                                                                                                                                                                                             |
 
 ## Source Examples
@@ -610,7 +614,7 @@ Shared team inboxes are out of scope for this product surface until the single-u
 Team usage introduces assignment, shared policy, delegated approvals, shared credentials, multi-user audit, and conflict resolution.
 Those requirements should be treated as a later product or a major mode, not a small extension of MVP.
 
-Core status includes agent target and source, installed plugin sync health, item counts by local state, queue counts, and event count.
+Core status includes agent target and source, installed plugin sync health, item counts by local state, queue counts, event count, running work counts, and waiting PR jobs with the immediate attach command.
 
 Users should be able to inspect one recommendation and see the exact prompt context summary, action schemas, ACP target, model when reported, token usage, and plugin validation warnings.
 

@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import React from "react";
 
-import { mainLayout, willDoWindow } from "./render.js";
+import { activityLabel, mainLayout, willDoWindow } from "./render.js";
 import { confidenceColor, theme } from "./theme.js";
 
 const h = React.createElement;
@@ -25,11 +25,17 @@ function Key({ keyLabel, label, color }) {
   );
 }
 
+// The header carries chrome only: brand, the running-work cluster, daemon
+// liveness and the agent target. The item count lives in the INBOX panel title
+// (where the items live), keeping the top bar free for activity.
 function Header({ model, width }) {
-  const { status, count, daemonRunning } = model;
+  const { status, daemonRunning } = model;
   const live = daemonRunning
     ? h(Text, { color: theme.green }, "● live")
     : h(Text, { color: theme.red, bold: true }, "○ offline");
+  // Running work is state re-read on every poll tick - it self-updates and
+  // self-clears, unlike a one-shot notice. Hidden entirely when idle.
+  const running = activityLabel(status.activity);
   return h(
     Box,
     {
@@ -43,18 +49,18 @@ function Header({ model, width }) {
     h(Chip, { label: "m87", color: theme.accent }),
     h(Text, { color: theme.muted }, "  review queue  "),
     h(Box, { flexGrow: 1 }),
+    running ? h(Text, { color: theme.yellow }, running) : null,
+    running ? h(Text, { color: theme.dim }, "   ") : null,
     live,
     h(Text, { color: theme.dim }, "   "),
     h(Text, { color: theme.accentAlt }, `◆ ${status.agentTarget}`),
-    h(Text, { color: theme.dim }, "   "),
-    h(Text, { color: theme.fg, bold: true }, `${count} `),
-    h(Text, { color: theme.muted }, count === 1 ? "item" : "items"),
   );
 }
 
 function badgeColor(badge) {
   if (badge === "contrib") return theme.accentAlt;
   if (badge === "stale") return theme.yellow;
+  if (badge === "fix") return theme.accentAlt;
   return theme.muted;
 }
 
@@ -198,6 +204,7 @@ function InboxPane({ model, width, height }) {
       Box,
       { flexDirection: "row" },
       h(Text, { color: theme.accent, bold: true }, "INBOX"),
+      h(Text, { color: theme.muted }, ` · ${items.length}`),
       h(Text, { color: theme.dim }, moreAbove ? "  ↑ more" : ""),
       h(Box, { flexGrow: 1 }),
       h(Text, { color: theme.dim }, moreBelow ? "more ↓" : ""),
@@ -327,7 +334,24 @@ function DetailPane({ model, width, height }) {
       ),
     ];
   } else {
+    const job = model.detail.runningJob;
     body = [
+      // Automation already in flight for this item: surfaced above the
+      // recommendation so the user never re-approves work that is running.
+      job
+        ? h(
+            Box,
+            { key: "job", width: innerWidth, height: 1 },
+            h(
+              Text,
+              { color: theme.yellow },
+              trunc(
+                `⚙ fix ${job.phase === "waiting_for_pr" ? "awaiting PR" : "in flight"}${job.branch ? ` · ${job.branch}` : ""}`,
+                innerWidth,
+              ),
+            ),
+          )
+        : null,
       h(
         Box,
         { key: "summary", marginBottom: 1, width: innerWidth },
@@ -485,6 +509,13 @@ export function InfoView({ model, width = 100, height = 30 }) {
       { label: "inbox" },
       h(Text, { color: theme.fg }, `${count} `),
       h(Text, { color: theme.muted }, count === 1 ? "item" : "items"),
+    ),
+    h(
+      InfoRow,
+      { label: "running" },
+      activityLabel(status.activity)
+        ? h(Text, { color: theme.yellow }, activityLabel(status.activity))
+        : h(Text, { color: theme.dim }, "idle"),
     ),
 
     h(

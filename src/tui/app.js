@@ -37,6 +37,7 @@ function InboxApp({ db, agentTarget, daemonPid }) {
   const [cursor, setCursor] = useState(logCursor(db));
   const [notice, setNotice] = useState("");
   const [view, setView] = useState("inbox");
+  const noticeTimer = useRef(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -47,6 +48,29 @@ function InboxApp({ db, agentTarget, daemonPid }) {
     }, 500);
     return () => clearInterval(timer);
   }, [cursor, db]);
+
+  useEffect(
+    () => () => {
+      if (noticeTimer.current) {
+        clearTimeout(noticeTimer.current);
+      }
+    },
+    [],
+  );
+
+  // Ack notices confirm a keypress and then clear on their own - the header's
+  // activity cluster carries the ongoing state, so the bottom row never lies
+  // about minutes-old work. Errors are sticky until the next action.
+  function showNotice(text, { sticky = false } = {}) {
+    if (noticeTimer.current) {
+      clearTimeout(noticeTimer.current);
+      noticeTimer.current = null;
+    }
+    setNotice(text);
+    if (!sticky) {
+      noticeTimer.current = setTimeout(() => setNotice(""), 4000);
+    }
+  }
 
   const inbox = listInbox(db);
   const anchoredIndex = inbox.findIndex(
@@ -86,11 +110,13 @@ function InboxApp({ db, agentTarget, daemonPid }) {
   // the event would sit unprocessed, so we refuse and tell the user.
   function act(event, label) {
     if (!daemonPid()) {
-      setNotice("daemon not running - start it with `m87 daemon start`");
+      showNotice("daemon not running - start it with `m87 daemon start`", {
+        sticky: true,
+      });
       return;
     }
     enqueue(db, event, { lane: "interactive" });
-    setNotice(`${label} queued`);
+    showNotice(`${label} queued`);
     setCursor(logCursor(db));
   }
 

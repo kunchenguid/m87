@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 import { runAcpTurn } from "../agent/acp.js";
 import { noopLogger } from "../core/log.js";
 import { promptContextRetention } from "../core/retention.js";
-import { syncRetryDelayMs } from "../core/scheduler.js";
+import {
+  PR_CHECK_WARN_AFTER_MS,
+  prCheckDelayMs,
+  syncRetryDelayMs,
+} from "../core/scheduler.js";
 import {
   buildFixPrompt,
   buildTriagePrompt,
@@ -41,6 +45,98 @@ function loadItem(db, itemId) {
   return db.prepare("select * from items where id = ?").get(itemId);
 }
 
+const excerpt = (text, max = 240) => {
+  if (typeof text !== "string") {
+    return null;
+  }
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max)}…` : clean || null;
+};
+
+// What core already knows about automation on this item: approved jobs that
+// are queued/running (or recently finished), the actions that executed, and
+// the approval that authorized them. Triage injects this so a re-triage fired
+// by new source activity cannot recommend work an approved automation is
+// already doing. Core-owned tables only - the plugin's source context is
+// untouched.
+export function localAutomationState(db, itemId) {
+  const jobRow = (j) => {
+    const meta = parseJson(j.metadata_json, {});
+    return {
+      kind: j.kind,
+      status: j.status,
+      phase: j.phase,
+      ...(meta.branch ? { branch: meta.branch } : {}),
+      ...(meta.pr_url ? { pr_url: meta.pr_url } : {}),
+      started_at: j.started_at ?? j.created_at,
+      ...(j.completed_at ? { completed_at: j.completed_at } : {}),
+      ...(j.error ? { error: j.error } : {}),
+      prompt_excerpt: excerpt(meta.automation?.prompt ?? j.prompt),
+    };
+  };
+  const openJobs = db
+    .prepare(
+      `select * from jobs where item_id=? and status in ('queued','running')
+        order by created_at desc`,
+    )
+    .all(itemId)
+    .map(jobRow);
+  const recentJobs = db
+    .prepare(
+      `select * from jobs where item_id=? and status in ('succeeded','failed')
+        order by completed_at desc limit 3`,
+    )
+    .all(itemId)
+    .map(jobRow);
+  const recentActions = db
+    .prepare(
+      `select action_type, status, result_json, completed_at
+         from action_results where item_id=? and completed_at is not null
+        order by completed_at desc limit 5`,
+    )
+    .all(itemId)
+    .map((a) => {
+      const result = parseJson(a.result_json, {});
+      return {
+        action_type: a.action_type,
+        status: a.status,
+        ...(result.comment_url || result.url
+          ? { url: result.comment_url ?? result.url }
+          : {}),
+        completed_at: a.completed_at,
+      };
+    });
+  const approval = db
+    .prepare(
+      `select a.created_at, o.title
+         from approvals a
+         left join recommendation_options o on o.id = a.option_id
+        where a.item_id=? order by a.created_at desc limit 1`,
+    )
+    .get(itemId);
+  if (
+    openJobs.length === 0 &&
+    recentJobs.length === 0 &&
+    recentActions.length === 0 &&
+    !approval
+  ) {
+    return null;
+  }
+  return {
+    ...(openJobs.length > 0 ? { open_jobs: openJobs } : {}),
+    ...(recentJobs.length > 0 ? { recent_jobs: recentJobs } : {}),
+    ...(recentActions.length > 0 ? { recent_actions: recentActions } : {}),
+    ...(approval
+      ? {
+          prior_approval: {
+            option_title: approval.title ?? null,
+            decided_at: approval.created_at,
+          },
+        }
+      : {}),
+  };
+}
+
 // An automation block is only usable when the agent filled in both required
 // fields: `kind` (the short user-visible label) and `prompt` (the task the
 // automation agent runs with). Anything else is dropped here so a degenerate
@@ -59,6 +155,10 @@ export function normalizeAutomation(automation) {
  */
 export function createEffects(ctx) {
   const { db, stateDir, config = {}, agentSpec, logger = noopLogger } = ctx;
+  // The PR-recheck backoff tops out at the daemon's poll cadence: once a fix
+  // job has waited a while, probing faster than the rest of the system syncs
+  // buys nothing.
+  const prCheckCapMs = (config.poll_interval ?? 300) * 1000;
 
   // sync: plugin diff -> root item events; persist the fingerprint baseline.
   async function sync(spec, api) {
@@ -157,6 +257,7 @@ export function createEffects(ctx) {
       (a) => role !== "contributor" || !MAINTAINER_ONLY.has(a?.type),
     );
     const userPolicy = loadUserPolicy(stateDir);
+    const automationState = localAutomationState(db, item.id);
     const input = {
       item_id: item.id,
       plugin_source_context: {
@@ -175,6 +276,7 @@ export function createEffects(ctx) {
       },
       evidence_catalog: context.evidence,
       plugin_action_catalog: actionCatalog,
+      ...(automationState ? { local_automation_state: automationState } : {}),
       ...(userPolicy ? { user_policy: userPolicy } : {}),
       ...(spec.rerun_instructions
         ? { rerun_instructions: spec.rerun_instructions }
@@ -419,7 +521,8 @@ export function createEffects(ctx) {
       });
       // The PR may not be detectable yet (e.g. the no-mistakes path opens it
       // asynchronously, or a contributor push awaits manual review). Keep the
-      // job alive in waiting_for_pr so `job attach` can re-detect it (FU-15).
+      // job alive in waiting_for_pr; the daemon's scheduler re-probes it on a
+      // capped backoff (and `job attach` remains the manual fast-path) (FU-15).
       if (submit.status === "waiting_for_pr") {
         api.emit({
           entity: "job",
@@ -429,6 +532,10 @@ export function createEffects(ctx) {
             job_id: job.id,
             status: "running",
             phase: "waiting_for_pr",
+            check_attempts: 0,
+            next_check_at: new Date(
+              Date.now() + prCheckDelayMs(0, prCheckCapMs),
+            ).toISOString(),
             metadata: {
               branch: submit.branch,
               repository: submit.repository,
@@ -494,6 +601,7 @@ export function createEffects(ctx) {
       api.emit({
         entity: "job",
         lifecycle: "closed",
+        item_id: job.item_id,
         payload: {
           type: "pr_opened",
           job_id: job.id,
@@ -504,6 +612,25 @@ export function createEffects(ctx) {
       });
       return;
     }
+    // Still nothing: stay in the probe rotation with one more attempt on the
+    // backoff clock. There is no give-up - the job probes at the cap until the
+    // PR appears - but a suspiciously long wait is worth a warning in the
+    // daemon log.
+    const attempts = (job.check_attempts ?? 0) + 1;
+    const waitedMs = job.started_at
+      ? Date.now() - Date.parse(job.started_at)
+      : 0;
+    const prCheckWarnedAt = meta.pr_check_warned_at ?? null;
+    const shouldWarn = waitedMs >= PR_CHECK_WARN_AFTER_MS && !prCheckWarnedAt;
+    if (shouldWarn) {
+      logger.warn("fix job still waiting for its PR", {
+        job: job.id,
+        branch: meta.branch,
+        repository,
+        waited_hours: Math.floor(waitedMs / 3_600_000),
+        attempts,
+      });
+    }
     api.emit({
       entity: "job",
       lifecycle: "updated",
@@ -512,6 +639,11 @@ export function createEffects(ctx) {
         job_id: job.id,
         status: "running",
         phase: "waiting_for_pr",
+        check_attempts: attempts,
+        ...(shouldWarn ? { metadata: { pr_check_warned_at: nowIso() } } : {}),
+        next_check_at: new Date(
+          Date.now() + prCheckDelayMs(attempts, prCheckCapMs),
+        ).toISOString(),
       },
     });
   }

@@ -66,5 +66,57 @@ export function statusSummary(db) {
       .prepare("select count(*) c from queue where status='dead_letter'")
       .get().c,
     items: Object.fromEntries(byState.map((r) => [r.local_state, r.c])),
+    activity: runningActivity(db),
   };
+}
+
+// What is actively running right now, for the header's activity cluster.
+// Running work is STATE, not a notice: these counts are re-read on every poll
+// tick, so they self-update and self-clear by construction.
+//   triage      - an agent is producing a recommendation
+//   fix         - an automation agent is editing a workspace
+//   awaiting_pr - fix work done; the PR probe has not found the PR yet
+//   action      - a plugin action (comment/label) is executing
+export function runningActivity(db) {
+  return {
+    triage: db
+      .prepare("select count(*) c from agent_runs where status='running'")
+      .get().c,
+    fix: db
+      .prepare(
+        "select count(*) c from jobs where status='running' and phase != 'waiting_for_pr'",
+      )
+      .get().c,
+    awaiting_pr: db
+      .prepare(
+        "select count(*) c from jobs where status='running' and phase = 'waiting_for_pr'",
+      )
+      .get().c,
+    action: db
+      .prepare("select count(*) c from action_results where status='running'")
+      .get().c,
+  };
+}
+
+// item_id -> the open automation job on it ({ phase, branch }). The inbox uses
+// this for the per-row `fix` badge and the detail pane's in-flight line, so a
+// re-triaged item visibly carries its running automation.
+export function runningJobByItem(db) {
+  const rows = db
+    .prepare(
+      `select item_id, phase, metadata_json from jobs
+        where status in ('queued','running')`,
+    )
+    .all();
+  const map = new Map();
+  for (const row of rows) {
+    let branch = null;
+    try {
+      branch = JSON.parse(row.metadata_json ?? "{}").branch ?? null;
+    } catch {
+      branch = null;
+    }
+    map.set(row.item_id, { phase: row.phase, branch });
+  }
+  return map;
 }

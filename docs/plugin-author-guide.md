@@ -165,7 +165,8 @@ Use `item_title`, `option_title`, and `prompt` when creating branch names, commi
 
 `submit-automation-workspace` receives `{ config, job, workspace_path, approval_id, idempotency_key }`.
 It should return `submitted`, `no_changes`, `waiting_for_pr`, or `failed`.
-Use `waiting_for_pr` when the source accepted the change but the review surface is created asynchronously; `detect-automation-pr` can later resolve that job to `submitted`.
+Use `waiting_for_pr` when the source accepted the change but the review surface is created asynchronously.
+M87 automatically calls `detect-automation-pr` on a capped backoff until that job resolves to `submitted`; users can also run `m87 job attach <job-id>` for an immediate re-check.
 Submit commands must be idempotent for the provided `idempotency_key` and must not open duplicate review requests for the same job.
 
 ## Authoring Checklist

@@ -21,7 +21,7 @@ Fix jobs are queued by approvals, executed by daemon effects, and inspected thro
 - The `jobs` table stores queued, running, succeeded, and failed automation jobs with phase, prompt, metadata, and timestamps.
 - On approval, an option's `automation: { kind, prompt }` inserts a queued job and schedules the daemon effect.
 - The fix-job effect runner in `src/host/effects.js` prepares the plugin workspace, runs the ACP coding agent in that workspace, submits the workspace, and records phase transitions.
-- `m87 job attach` can re-check a waiting job when PR detection was delayed.
+- The daemon automatically re-checks waiting jobs when PR detection was delayed; `m87 job attach` remains the manual immediate re-check path.
 - The ACP runtime accepts a working directory so fix jobs run inside the prepared workspace rather than the caller's current directory.
 
 So the data model, queueing path, execution path, and PR re-detection path are implemented.
@@ -72,7 +72,8 @@ The GitHub plugin supports `fix_pr_create`: `auto` (default), `no-mistakes`, `gh
 `auto` prefers no-mistakes when the binary is on PATH and falls back to `gh` otherwise (or when the no-mistakes push fails).
 
 no-mistakes is a local git proxy, not a `gh` replacement: the plugin ensures the gate remote exists (`git remote get-url no-mistakes`, running `no-mistakes init` when missing) and then runs `git push no-mistakes HEAD:<branch>`.
-The pipeline validates the change and opens the PR asynchronously, so the submit returns `waiting_for_pr` when the PR is not yet detectable and `m87 job attach` re-detects it later.
+The pipeline validates the change and opens the PR asynchronously, so the submit returns `waiting_for_pr` when the PR is not yet detectable.
+The daemon then re-detects it on a capped backoff until it appears, while `m87 job attach` remains available for an immediate manual check.
 Contributor pushes have the analogous `fix_contrib_push` modes: `auto`, `no-mistakes` (default: leave the commit for manual review), or `disabled`.
 
 The commit subject doubles as the PR title on paths that derive the PR from the commit (no-mistakes), so the plugin writes a human-facing commit message from the job's `item_title`/`option_title`/`prompt` context rather than internal job ids.
@@ -91,15 +92,16 @@ Workspace submit commands are `external_write`/`destructive`-class operations; t
 
 The job runs through explicit phases stored in `jobs.phase`, with `jobs.status` summarizing terminal state. This mirrors the item-state model already in the PRD.
 
-| status      | phase                 | Meaning                                                      |
-| ----------- | --------------------- | ------------------------------------------------------------ |
-| `queued`    | `pending`             | Inserted at approval; not yet claimed.                       |
-| `running`   | `preparing_workspace` | Daemon claimed it; plugin is cloning/worktreeing.            |
-| `running`   | `running_agent`       | ACP coding agent is editing the workspace.                   |
-| `running`   | `submitting`          | Plugin is committing/pushing/opening the PR.                 |
-| `succeeded` | `pr_opened`           | Draft PR created; `metadata_json.pr_url` set.                |
-| `succeeded` | `no_changes`          | Agent produced no diff; recorded, no PR.                     |
-| `failed`    | `failed`              | Any step failed; `error` set, workspace left for inspection. |
+| status      | phase                 | Meaning                                                                                   |
+| ----------- | --------------------- | ----------------------------------------------------------------------------------------- |
+| `queued`    | `pending`             | Inserted at approval; not yet claimed.                                                    |
+| `running`   | `preparing_workspace` | Daemon claimed it; plugin is cloning/worktreeing.                                         |
+| `running`   | `running_agent`       | ACP coding agent is editing the workspace.                                                |
+| `running`   | `submitting`          | Plugin is committing/pushing/opening the PR.                                              |
+| `running`   | `waiting_for_pr`      | Submission succeeded but the review request is not visible yet; the daemon keeps probing. |
+| `succeeded` | `pr_opened`           | Draft PR created; `metadata_json.pr_url` set.                                             |
+| `succeeded` | `no_changes`          | Agent produced no diff; recorded, no PR.                                                  |
+| `failed`    | `failed`              | Any step failed; `error` set, workspace left for inspection.                              |
 
 Claiming is queue-backed: the daemon consumes fix-job effects, records phase transitions, and relies on the queue/effect model to avoid duplicate execution.
 Automatic stale-job requeueing is not implemented in the current release.
@@ -114,8 +116,8 @@ Per cycle:
 2. `prepare-automation-workspace` via the item's plugin -> `preparing_workspace`.
 3. Run the ACP coding agent in `workspace_path` with the job prompt -> `running_agent`.
 4. `submit-automation-workspace` -> `submitting` -> `pr_opened`, `no_changes`, or `waiting_for_pr`.
-5. Persist phase, `pr_url`, and metadata at each transition through job events.
-6. Use `m87 job attach` / `detect-automation-pr` to close a `waiting_for_pr` job after delayed PR creation.
+5. Persist phase, `pr_url`, metadata, `check_attempts`, and `next_check_at` at each transition through job events.
+6. Re-probe due `waiting_for_pr` jobs with `detect-automation-pr` until the PR appears; `m87 job attach` uses the same detection path for immediate manual checks.
 
 Queue-backed execution keeps remote writes paced and observable while preserving the same event-driven projection model as triage and actions.
 
@@ -136,6 +138,7 @@ There is no second approval prompt before the draft PR; cautious users control s
 
 - A failed step sets `status: failed`, records `error`, and leaves the workspace on disk for inspection (ezoss does the same).
 - `submit-automation-workspace` is idempotent on `idempotency_key` so a retried submit re-detects the existing PR instead of opening a duplicate.
+- `waiting_for_pr` jobs keep probing with no give-up ceiling; a daemon warning is logged after a 24 hour wait.
 - A daemon crash mid-run leaves the job record for inspection; automatic stale-job reclaim is future recovery work.
 - Workspaces are retained per the retention model; add a `workspace_ttl` so old checkouts are cleaned.
 

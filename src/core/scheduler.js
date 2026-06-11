@@ -49,3 +49,45 @@ export function selectPluginsDueForSync(db, now) {
     )
     .all(now);
 }
+
+// PR-recheck backoff for fix jobs parked in waiting_for_pr. A submit path that
+// opens the PR asynchronously (no-mistakes) usually lands within a minute or
+// two, so the first probe comes quickly and later probes back off toward the
+// daemon's poll cadence. There is deliberately NO give-up ceiling: a job keeps
+// probing at the cap until the PR appears (or the user closes the job), and the
+// host surfaces a warning once the wait turns suspiciously long.
+export const PR_CHECK_BASE_MS = 30_000; // 30 seconds
+export const PR_CHECK_WARN_AFTER_MS = 24 * 60 * 60_000; // 24 hours
+
+/**
+ * How long to wait before the next PR probe.
+ *
+ * @param {number} checkAttempts - probes already made (>= 0)
+ * @param {number} capMs - ceiling, normally the daemon's poll interval
+ * @returns {number} delay in milliseconds
+ */
+export function prCheckDelayMs(checkAttempts, capMs) {
+  const cap = Math.max(PR_CHECK_BASE_MS, capMs);
+  const n = Math.max(0, checkAttempts);
+  return Math.min(PR_CHECK_BASE_MS * 2 ** n, cap);
+}
+
+/**
+ * The fix jobs due for a PR probe at `now`: running jobs parked in
+ * waiting_for_pr whose next_check_at has elapsed (or was never set - jobs
+ * parked before this policy existed re-enter the rotation immediately).
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} now - ISO timestamp
+ * @returns {{ id: string, check_attempts: number, started_at: string|null }[]}
+ */
+export function selectJobsDueForPrCheck(db, now) {
+  return db
+    .prepare(
+      `select id, check_attempts, started_at from jobs
+        where status = 'running'
+          and phase = 'waiting_for_pr'
+          and (next_check_at is null or next_check_at <= ?)`,
+    )
+    .all(now);
+}

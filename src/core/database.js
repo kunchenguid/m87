@@ -220,7 +220,9 @@ create table jobs (
   created_at text not null,
   started_at text,
   updated_at text not null,
-  completed_at text
+  completed_at text,
+  check_attempts integer not null default 0, -- PR-recheck streak (backoff input)
+  next_check_at text                   -- when a waiting_for_pr job is re-probed
 );
 create index jobs_status on jobs(status);
 
@@ -290,6 +292,10 @@ function initialize(database) {
   ensureColumns(database, "plugins", {
     consecutive_failures: "integer not null default 0",
     next_retry_at: "text",
+  });
+  ensureColumns(database, "jobs", {
+    check_attempts: "integer not null default 0",
+    next_check_at: "text",
   });
 }
 

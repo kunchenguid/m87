@@ -224,4 +224,49 @@ describe("tui/buildInboxModel", () => {
     expect(model.detail.options[0].selected).toBe(true);
     expect(model.detail.options[1].selected).toBe(false);
   });
+
+  it("counts running work for the header activity cluster", () => {
+    surfaceItem(db);
+    db.prepare(
+      `insert into agent_runs (id,item_id,agent_spec,acp_target_redacted,acp_session_key,status,tokens_in,tokens_out,usage_estimated)
+       values ('run-1', ?, 'acp:x','acp:x','k','running',0,0,0)`,
+    ).run(ITEM);
+    db.prepare(
+      `insert into jobs (id,item_id,kind,status,phase,prompt,metadata_json,created_at,updated_at)
+       values ('job-w', ?, 'fix','running','waiting_for_pr','','{}','t','t'),
+              ('job-r', ?, 'fix','running','running_agent','','{}','t','t')`,
+    ).run(ITEM, ITEM);
+    const model = buildInboxModel(db, {});
+    expect(model.status.activity).toMatchObject({
+      triage: 1,
+      fix: 1,
+      awaiting_pr: 1,
+      action: 0,
+    });
+  });
+
+  it("badges a re-surfaced item with open automation and exposes the running job in detail", () => {
+    surfaceItem(db);
+    recommend(db, [
+      { title: "Wait for the fix", confidence: "high", actions: [] },
+    ]);
+    db.prepare(
+      `insert into jobs (id,item_id,kind,status,phase,prompt,metadata_json,created_at,updated_at)
+       values ('job-1', ?, 'fix','running','waiting_for_pr','', ?, 't','t')`,
+    ).run(ITEM, JSON.stringify({ branch: "m87/fix-job-1" }));
+    const model = buildInboxModel(db, { selectedIndex: 0 });
+    expect(model.items[0].badges).toContain("fix");
+    expect(model.detail.runningJob).toEqual({
+      phase: "waiting_for_pr",
+      branch: "m87/fix-job-1",
+    });
+  });
+
+  it("leaves runningJob null when the item has no open automation", () => {
+    surfaceItem(db);
+    recommend(db, [{ title: "Reply", confidence: "high", actions: [] }]);
+    const model = buildInboxModel(db, { selectedIndex: 0 });
+    expect(model.items[0].badges).not.toContain("fix");
+    expect(model.detail.runningJob).toBeNull();
+  });
 });

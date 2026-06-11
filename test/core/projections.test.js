@@ -344,6 +344,82 @@ describe("core/projections", () => {
     expect(job.completed_at).not.toBeNull();
   });
 
+  it("job.updated projects the PR-probe schedule; job.closed clears it", () => {
+    project(db, itemCreated());
+    project(
+      db,
+      makeEvent({
+        actor: "core",
+        entity: "job",
+        lifecycle: "created",
+        item_id: ITEM,
+        payload: { type: "queued", job_id: "job-2", kind: "fix", prompt: "x" },
+      }),
+    );
+    project(
+      db,
+      makeEvent({
+        actor: "core",
+        entity: "job",
+        lifecycle: "updated",
+        item_id: ITEM,
+        payload: {
+          type: "waiting_for_pr",
+          job_id: "job-2",
+          status: "running",
+          phase: "waiting_for_pr",
+          check_attempts: 3,
+          next_check_at: "2026-05-28T12:04:00.000Z",
+        },
+      }),
+    );
+    expect(
+      db
+        .prepare(
+          "select check_attempts,next_check_at from jobs where id='job-2'",
+        )
+        .get(),
+    ).toMatchObject({
+      check_attempts: 3,
+      next_check_at: "2026-05-28T12:04:00.000Z",
+    });
+    // An update without schedule fields preserves the existing schedule.
+    project(
+      db,
+      makeEvent({
+        actor: "core",
+        entity: "job",
+        lifecycle: "updated",
+        item_id: ITEM,
+        payload: { type: "waiting_for_pr", job_id: "job-2" },
+      }),
+    );
+    expect(
+      db.prepare("select check_attempts from jobs where id='job-2'").get()
+        .check_attempts,
+    ).toBe(3);
+    // Closing the job removes it from the probe rotation.
+    project(
+      db,
+      makeEvent({
+        actor: "core",
+        entity: "job",
+        lifecycle: "closed",
+        item_id: ITEM,
+        payload: {
+          type: "pr_opened",
+          job_id: "job-2",
+          status: "succeeded",
+          phase: "pr_opened",
+        },
+      }),
+    );
+    expect(
+      db.prepare("select next_check_at from jobs where id='job-2'").get()
+        .next_check_at,
+    ).toBeNull();
+  });
+
   it("replayFold rebuilds the same state (replay-safe)", () => {
     const events = [
       itemCreated(),
