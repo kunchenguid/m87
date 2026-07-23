@@ -2,11 +2,11 @@
 
 The committed m87 workflow was parsed and its real signature-check shell step was executed for three PR-body events at the same fixed head, `0cb55b10b17d299c056a1e8ba063f8327513b5f7`.
 
-| Run ID | Run number | Action | Head SHA | Concurrency group | Terminal conclusion |
-| ---: | ---: | --- | --- | --- | --- |
-| `401001` | 101 | opened | `0cb55b10b17d299c056a1e8ba063f8327513b5f7` | `no-mistakes-required-30-401001` | **success** |
-| `401002` | 102 | edited | `0cb55b10b17d299c056a1e8ba063f8327513b5f7` | `no-mistakes-required-30-401002` | **failure** |
-| `401003` | 103 | edited | `0cb55b10b17d299c056a1e8ba063f8327513b5f7` | `no-mistakes-required-30-401003` | **success** |
+|   Run ID | Run number | Action | Head SHA                                   | Concurrency group                | Terminal conclusion |
+| -------: | ---------: | ------ | ------------------------------------------ | -------------------------------- | ------------------- |
+| `401001` |        101 | opened | `0cb55b10b17d299c056a1e8ba063f8327513b5f7` | `no-mistakes-required-30-401001` | **success**         |
+| `401002` |        102 | edited | `0cb55b10b17d299c056a1e8ba063f8327513b5f7` | `no-mistakes-required-30-401002` | **failure**         |
+| `401003` |        103 | edited | `0cb55b10b17d299c056a1e8ba063f8327513b5f7` | `no-mistakes-required-30-401003` | **success**         |
 
 ## Reviewer-visible run titles
 
