@@ -100,7 +100,10 @@ function isCovered(filter, releasePath) {
   for (const pattern of filter.paths) {
     if (pattern.startsWith("!")) {
       const negated = pattern.slice(1);
-      if (matched && (negated === releasePath || globMatch(negated, releasePath))) {
+      if (
+        matched &&
+        (negated === releasePath || globMatch(negated, releasePath))
+      ) {
         matched = false;
       }
       continue;
@@ -144,7 +147,10 @@ describe("release-please CI exclusions", () => {
       const filePath = join(workflowsDir, name);
       const on = loadWorkflowOn(filePath);
       if (!on || typeof on !== "object" || !("pull_request" in on)) continue;
-      prWorkflows.push({ name, filter: pullRequestFilterCoverage(on.pull_request) });
+      prWorkflows.push({
+        name,
+        filter: pullRequestFilterCoverage(on.pull_request),
+      });
     }
 
     expect(prWorkflows.map((w) => w.name).sort()).toEqual([
