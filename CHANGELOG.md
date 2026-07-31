@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/kunchenguid/m87/compare/m87-v0.1.9...m87-v0.1.10) (2026-07-23)
+
+
+### Bug Fixes
+
+* execute every PR body compliance event ([#30](https://github.com/kunchenguid/m87/issues/30)) ([4c104f9](https://github.com/kunchenguid/m87/commit/4c104f9140d0cc4ad83d1a35c07e8815af31a666))
+
 ## [0.1.9](https://github.com/kunchenguid/m87/compare/m87-v0.1.8...m87-v0.1.9) (2026-06-11)
 
 
