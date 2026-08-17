@@ -26,3 +26,10 @@ Show friendly names for known tools (e.g. "Claude" rather than `acp:claude`); ke
 
 Internal identifiers, CLI command strings, log lines, and error/debug output aimed at developers are exempt - this rule is about the product surface end users see.
 The setup wizard in `src/setup/init-model.js` is the reference example, and `test/setup/init-model.test.js` has a sweep that fails if a wizard screen leaks these terms.
+
+## Maintaining this file
+
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.
