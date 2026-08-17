@@ -6,3 +6,5 @@ coverage/
 *.tgz
 CHANGELOG.md
 .agents/skills/no-mistakes/SKILL.md
+# Canonical two-line @AGENTS.md pointer; prettier would add a blank line.
+CLAUDE.md
