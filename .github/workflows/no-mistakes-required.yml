@@ -9,7 +9,9 @@ on:
     # pinned a FAILURE check run to the new head for a body the same run was
     # about to fix. GitHub keeps that failure next to the later edited SUCCESS,
     # and gh pr checks collapses same-named check runs by startedAt alone, so the
-    # CI monitor could park the run red forever (PR #773).
+    # CI monitor could park the run red forever (PR #773). This repository has
+    # no required status checks or legacy branch protection, so each head SHA
+    # does not need its own run.
     types: [opened, edited, reopened]
     branches:
       - main
