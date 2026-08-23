@@ -1,0 +1,9 @@
+=== compliant PR with duplicate review records (last wins): exit 0 (expected 0) ===
+Found no-mistakes signature in PR #42 body.
+Found structurally compliant pipeline step attestation.
+::warning::PR-body attestation is author-editable and is not cryptographic proof that no-mistakes produced it.
+=== stale attestation after a push: exit 1 (expected 1) ===
+Found no-mistakes signature in PR #42 body.
+::error::Pipeline attestation head_sha does not match the current PR head.
+=== PR bypassing no-mistakes: exit 1 (expected 1) ===
+::error::This PR was not raised through no-mistakes.

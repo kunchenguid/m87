@@ -1,0 +1,11 @@
+Workflow consumer contract: PASS
+trigger events: opened, edited, reopened
+event boundary: pull_request (no pull_request_target)
+job check name: PR must be raised via no-mistakes
+automation verdicts: github-actions[bot]=skipped, dependabot[bot]=skipped, release-please[bot]=skipped, contributor=checked
+permissions: contents=read
+steps: one shared composite action at immutable SHA 32d396ac0f29135daf7fcb9964aba9d5f4e796d6
+normalized comparison: only trigger types and check steps changed
+repository scope: only .github/workflows/no-mistakes-required.yml changed
++        uses: kunchenguid/no-mistakes/.github/actions/require-no-mistakes@32d396ac0f29135daf7fcb9964aba9d5f4e796d6 # post-v1.57.1, untagged (action added in #819)
+pin provenance comment: post-v1.57.1, untagged
